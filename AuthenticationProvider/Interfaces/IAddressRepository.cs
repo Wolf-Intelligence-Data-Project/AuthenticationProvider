@@ -1,0 +1,22 @@
+﻿using AuthenticationProvider.Models;
+using System.Threading.Tasks;
+
+namespace AuthenticationProvider.Interfaces;
+
+public interface IAddressRepository
+{
+    // Add a new address to the database
+    Task AddAsync(Address address);
+
+    // Get an address by its ID
+    Task<Address> GetByIdAsync(int id);
+
+    // Get all addresses for a specific company
+    Task<ICollection<Address>> GetAddressesByCompanyIdAsync(int companyId);
+
+    // Update an existing address
+    Task UpdateAsync(Address address);
+
+    // Delete an address by its ID
+    Task DeleteAsync(int id);
+}

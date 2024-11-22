@@ -1,15 +1,26 @@
+using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Repositories;
+using AuthenticationProvider.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Register services
+builder.Services.AddScoped<ISignUpService, SignUpService>();
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>(); // Your implementation of ICompanyRepository
+builder.Services.AddScoped<IAddressRepository, AddressRepository>();
+builder.Services.AddScoped<ITokenProvider, TokenProvider>(); // Placeholder implementation, will connect to TokenProvider service later
+builder.Services.AddScoped<IEmailVerificationProvider, EmailVerificationProvider>(); // Placeholder implementation, will connect to EmailVerificationProvider service later
 
+// Add controllers
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Add Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Enable Swagger UI in development environment
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +28,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

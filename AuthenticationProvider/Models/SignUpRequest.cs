@@ -35,7 +35,7 @@ public class SignUpRequest
     [Required]
     public bool TermsAndConditions { get; set; }
 
-    // Minimal address details
+    // Address Details
     [Required]
     public string StreetAddress { get; set; } = null!;
 
@@ -58,4 +58,8 @@ public class SignUpRequest
     [DataType(DataType.Password)]
     [Compare("Password", ErrorMessage = "Passwords do not match.")]
     public string ConfirmPassword { get; set; } = null!;
+
+    // Primary address reference (if necessary)
+    // Optional: You can include a reference to the primary address ID if you wish.
+    public int? PrimaryAddressId { get; set; }
 }
