@@ -2,6 +2,6 @@
 
 namespace AuthenticationProvider.Services;
 
-public class AuthService : IAuthService
+public class TokenService : ITokenService
 {
 }
