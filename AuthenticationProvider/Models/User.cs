@@ -1,5 +1,5 @@
 ﻿namespace AuthenticationProvider.Models;
 
-public class RegisterRequest
+public class User
 {
 }
