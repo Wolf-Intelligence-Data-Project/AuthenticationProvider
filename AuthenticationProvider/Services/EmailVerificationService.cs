@@ -9,12 +9,13 @@ public class EmailVerificationService : IEmailVerificationService
         _emailVerificationClient = emailVerificationClient;
     }
 
-    public async Task<bool> SendVerificationEmailAsync(string email, string token)
+    // Now only accepts token
+    public async Task<bool> SendVerificationEmailAsync(string token)
     {
         try
         {
-            // Call the EmailVerificationClient to send the email via the EmailVerificationProvider, passing both email and token
-            return await _emailVerificationClient.SendVerificationEmailAsync(email, token);
+            // Call the EmailVerificationClient to send the token via the EmailVerificationProvider
+            return await _emailVerificationClient.SendVerificationEmailAsync(token);
         }
         catch (Exception)
         {

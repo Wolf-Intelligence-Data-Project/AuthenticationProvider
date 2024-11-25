@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models;
+namespace AuthenticationProvider.Models.SignIn;
 
 public class SignInRequest
 {

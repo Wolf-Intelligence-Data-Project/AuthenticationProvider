@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.SignIn;
 
 namespace AuthenticationProvider.Interfaces
 {

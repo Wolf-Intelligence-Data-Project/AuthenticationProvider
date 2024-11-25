@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Services;
-using AuthenticationProvider.Models;
 using System.Threading.Tasks;
 using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Models.SignIn;
 
 namespace AuthenticationProvider.Controllers;
 

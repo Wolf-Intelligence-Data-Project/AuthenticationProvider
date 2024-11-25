@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Models.SignUp;
 
 namespace AuthenticationProvider.Interfaces;
 

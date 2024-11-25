@@ -1,5 +1,6 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.SignIn;
+using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Identity;
 using System.Threading.Tasks;
@@ -45,7 +46,7 @@ public class SignInService : ISignInService
         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
         // Step 3: Send the verification email
-        var emailSent = await _emailVerificationService.SendVerificationEmailAsync(request.Email, token);
+        var emailSent = await _emailVerificationService.SendVerificationEmailAsync(token);
         if (!emailSent)
         {
             return new SignInResponse

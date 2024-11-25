@@ -1,5 +1,6 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.SignUp;
+using AuthenticationProvider.Models.Tokens;
 using AuthenticationProvider.Services;
 using Microsoft.Extensions.Logging;
 
@@ -51,7 +52,7 @@ public class SignUpService : ISignUpService
         _logger.LogInformation("Generated email verification token for company {Email}: {Token}", company.Email, token);
 
         // Call the EmailVerificationProvider to send the email
-        bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(request.Email, token);
+        bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(token);
 
         if (!emailSent)
         {

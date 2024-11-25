@@ -1,4 +1,4 @@
-﻿namespace AuthenticationProvider.Models;
+﻿namespace AuthenticationProvider.Models.Tokens;
 
 public class JwtSettings
 {

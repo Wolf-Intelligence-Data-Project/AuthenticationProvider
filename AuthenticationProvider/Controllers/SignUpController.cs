@@ -1,5 +1,5 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;

@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
+using System.Net.Http;
 
 public class EmailVerificationClient
 {
@@ -10,13 +11,12 @@ public class EmailVerificationClient
         _httpClient = httpClient;
     }
 
-    public async Task<bool> SendVerificationEmailAsync(string email, string token)
+    public async Task<bool> SendVerificationEmailAsync(string token)
     {
-        // Create the request payload with both Email and Token
+        // Create the request payload with only the Token (no email)
         var requestPayload = new
         {
-            Email = email,
-            Token = token  // Include the token in the payload
+            Token = token  // Only send the token now
         };
 
         var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
@@ -24,7 +24,7 @@ public class EmailVerificationClient
         // Send POST request to the EmailVerificationProvider endpoint
         var response = await _httpClient.PostAsync("http://localhost:7092/api/SendVerificationEmail", content);
 
+        // Return true if the response is successful
         return response.IsSuccessStatusCode;
     }
-
 }

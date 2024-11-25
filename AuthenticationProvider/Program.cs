@@ -1,6 +1,6 @@
 using AuthenticationProvider.Data;
 using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.Tokens;
 using AuthenticationProvider.Repositories;
 using AuthenticationProvider.Services;
 using Microsoft.EntityFrameworkCore;
