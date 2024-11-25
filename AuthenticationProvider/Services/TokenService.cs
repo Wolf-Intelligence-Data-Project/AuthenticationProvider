@@ -1,27 +1,23 @@
-﻿using AuthenticationProvider.Services;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-public class TokenService : ITokenService
-{
-    private readonly IConfiguration _configuration;
+namespace AuthenticationProvider.Services;
 
-    public TokenService(IConfiguration configuration)
-    {
-        _configuration = configuration;
-    }
+public class TokenService(IConfiguration configuration) : ITokenService
+{
+    private readonly IConfiguration _configuration = configuration;
 
     // Generate a token (used for both login session and email verification)
     public string GenerateToken(string email, string tokenType)
     {
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, email),  // Storing email as 'sub' claim
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique ID for the token
-            new Claim("TokenType", tokenType)  // Custom claim to differentiate token types
-        };
+        new Claim(JwtRegisteredClaimNames.Sub, email),  // Storing email as 'sub' claim
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique ID for the token
+        new Claim("TokenType", tokenType)  // Custom claim to differentiate token types
+    };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -34,19 +30,7 @@ public class TokenService : ITokenService
             signingCredentials: creds
         );
 
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-        // Decode the token without validating it to see its claims
-        var decodedToken = new JwtSecurityTokenHandler().ReadJwtToken(tokenString);
-
-        // Log the claims of the token for debugging purposes
-        Console.WriteLine("Decoded Token Claims:");
-        foreach (var claim in decodedToken.Claims)
-        {
-            Console.WriteLine($"{claim.Type}: {claim.Value}");
-        }
-
-        return tokenString;  // Return the token to the client
+        return new JwtSecurityTokenHandler().WriteToken(token);  // Return the token to the client
     }
 
     // Validate a token and return the ClaimsPrincipal

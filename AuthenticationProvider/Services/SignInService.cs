@@ -1,9 +1,11 @@
 ﻿using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignIn;
 using AuthenticationProvider.Models.SignUp;
-using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Identity;
-using System.Threading.Tasks;
+
+namespace AuthenticationProvider.Services;
+
 public class SignInService : ISignInService
 {
     private readonly UserManager<ApplicationUser> _userManager;

@@ -9,14 +9,9 @@ namespace AuthenticationProvider.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class AuthController : ControllerBase
+public class AuthController(ISignInService signInService) : ControllerBase
 {
-    private readonly ISignInService _signInService;
-
-    public AuthController(ISignInService signInService)
-    {
-        _signInService = signInService;
-    }
+    private readonly ISignInService _signInService = signInService;
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] SignInRequest request)

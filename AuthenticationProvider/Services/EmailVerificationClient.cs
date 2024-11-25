@@ -2,21 +2,18 @@
 using System.Text;
 using System.Net.Http;
 
-public class EmailVerificationClient
-{
-    private readonly HttpClient _httpClient;
+namespace AuthenticationProvider.Services;
 
-    public EmailVerificationClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
+public class EmailVerificationClient(HttpClient httpClient)
+{
+    private readonly HttpClient _httpClient = httpClient;
 
     public async Task<bool> SendVerificationEmailAsync(string token)
     {
         // Create the request payload with only the Token (no email)
         var requestPayload = new
         {
-            Token = token  // Only send the token now
+            Token = token
         };
 
         var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");

@@ -1,9 +1,7 @@
-﻿using AuthenticationProvider.Models;
-using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using AuthenticationProvider.Data;
+using AuthenticationProvider.Models;
 
 namespace AuthenticationProvider.Repositories;
 

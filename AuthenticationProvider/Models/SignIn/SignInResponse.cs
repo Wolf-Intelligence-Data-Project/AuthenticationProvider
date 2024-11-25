@@ -1,4 +1,6 @@
-﻿public class SignInResponse
+﻿namespace AuthenticationProvider.Models.SignIn;
+
+public class SignInResponse
 {
     public bool Success { get; set; }
     public string ErrorMessage { get; set; }

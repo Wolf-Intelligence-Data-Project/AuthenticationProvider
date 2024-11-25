@@ -1,4 +1,6 @@
-﻿public class Company
+﻿namespace AuthenticationProvider.Models;
+
+public class Company
 {
     public int Id { get; set; }
     public string OrganisationNumber { get; set; }

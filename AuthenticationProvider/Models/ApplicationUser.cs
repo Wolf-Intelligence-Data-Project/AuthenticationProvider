@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
+namespace AuthenticationProvider.Models;
+
 public class ApplicationUser : IdentityUser
 {
     // Company properties

@@ -1,8 +1,8 @@
 ﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models.Tokens;
-using AuthenticationProvider.Services;
-using Microsoft.Extensions.Logging;
+
+namespace AuthenticationProvider.Services;
 
 public class SignUpService : ISignUpService
 {
@@ -27,7 +27,6 @@ public class SignUpService : ISignUpService
     {
         if (await _companyRepository.CompanyExistsAsync(request.OrganisationNumber, request.Email))
         {
-            _logger.LogWarning("Company with Organisation Number {OrganisationNumber} or Email {Email} already exists.", request.OrganisationNumber, request.Email);
             throw new InvalidOperationException("Company with the provided Organisation Number or Email already exists.");
         }
 
@@ -48,19 +47,13 @@ public class SignUpService : ISignUpService
         // Generate email verification token
         var token = _tokenService.GenerateToken(company.Email, TokenType.EmailVerification.ToString());
 
-        // Log the generated token
-        _logger.LogInformation("Generated email verification token for company {Email}: {Token}", company.Email, token);
-
         // Call the EmailVerificationProvider to send the email
         bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(token);
 
         if (!emailSent)
         {
-            _logger.LogError("Failed to send verification email to {Email}.", request.Email);
             throw new InvalidOperationException("Failed to send verification email.");
         }
-
-        _logger.LogInformation("Verification email successfully sent to {Email}.", request.Email);
 
         return new SignUpResponse
         {

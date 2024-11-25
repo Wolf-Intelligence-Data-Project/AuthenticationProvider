@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
+namespace AuthenticationProvider.Models;
+
 public class AddressRequest
 {
     [Required]

@@ -1,15 +1,11 @@
 ﻿using AuthenticationProvider.Interfaces;
 
-public class EmailVerificationService : IEmailVerificationService
+namespace AuthenticationProvider.Services;
+
+public class EmailVerificationService(EmailVerificationClient emailVerificationClient) : IEmailVerificationService
 {
-    private readonly EmailVerificationClient _emailVerificationClient;
+    private readonly EmailVerificationClient _emailVerificationClient = emailVerificationClient;
 
-    public EmailVerificationService(EmailVerificationClient emailVerificationClient)
-    {
-        _emailVerificationClient = emailVerificationClient;
-    }
-
-    // Now only accepts token
     public async Task<bool> SendVerificationEmailAsync(string token)
     {
         try
