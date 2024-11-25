@@ -1,4 +1,5 @@
 ﻿using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models.Tokens;
 
