@@ -1,73 +1,71 @@
 ﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models;
-using System;
-using System.Threading.Tasks;
+using AuthenticationProvider.Services;
+using Microsoft.Extensions.Logging;
 
-namespace AuthenticationProvider.Services
+public class SignUpService : ISignUpService
 {
-    public class SignUpService : ISignUpService
+    private readonly ICompanyRepository _companyRepository;
+    private readonly ITokenService _tokenService;
+    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly ILogger<SignUpService> _logger;
+
+    public SignUpService(
+        ICompanyRepository companyRepository,
+        ITokenService tokenService,
+        IEmailVerificationService emailVerificationService,
+        ILogger<SignUpService> logger)
     {
-        private readonly ICompanyRepository _companyRepository;
-        private readonly IAddressRepository _addressRepository; // Declare address repository
-        private readonly ITokenProvider _tokenService;  
-        private readonly IEmailVerificationProvider _emailVerificationService;
+        _companyRepository = companyRepository;
+        _tokenService = tokenService;
+        _emailVerificationService = emailVerificationService;
+        _logger = logger;
+    }
 
-        // Constructor initializes the repositories
-        public SignUpService(
-            ICompanyRepository companyRepository,
-            IAddressRepository addressRepository,  // Inject address repository
-            ITokenProvider tokenService,
-            IEmailVerificationProvider emailVerificationService)
+    public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
+    {
+        if (await _companyRepository.CompanyExistsAsync(request.OrganisationNumber, request.Email))
         {
-            _companyRepository = companyRepository;
-            _addressRepository = addressRepository;  // Assign address repository to the private field
-            _tokenService = tokenService;
-            _emailVerificationService = emailVerificationService;
+            _logger.LogWarning("Company with Organisation Number {OrganisationNumber} or Email {Email} already exists.", request.OrganisationNumber, request.Email);
+            throw new InvalidOperationException("Company with the provided Organisation Number or Email already exists.");
         }
 
-        public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
+        var company = new Company
         {
-            // Check if the company already exists by Organisation Number or Email
-            if (await _companyRepository.CompanyExistsAsync(request.OrganisationNumber, request.Email))
-            {
-                throw new InvalidOperationException("Company with the provided Organisation Number or Email already exists.");
-            }
+            OrganisationNumber = request.OrganisationNumber,
+            CompanyName = request.CompanyName,
+            Email = request.Email,
+            BusinessType = request.BusinessType,
+            ResponsiblePersonName = request.ResponsiblePersonName,
+            PhoneNumber = request.PhoneNumber,
+            TermsAndConditions = request.TermsAndConditions,
+            IsVerified = false // Initially false
+        };
 
-            // Create the company
-            var company = new Company
-            {
-                OrganisationNumber = request.OrganisationNumber,
-                CompanyName = request.CompanyName,
-                Email = request.Email,
-                BusinessType = request.BusinessType,
-                ResponsiblePersonName = request.ResponsiblePersonName,
-                PhoneNumber = request.PhoneNumber,
-                TermsAndConditions = request.TermsAndConditions,
-                PrimaryAddress = new Address // You should also assign the address based on the request
-                {
-                    StreetAddress = request.StreetAddress,
-                    PostalCode = request.PostalCode,
-                    City = request.City,
-                    Region = request.Region
-                }
-            };
+        await _companyRepository.AddAsync(company);
 
-            // Add the company to the repository (this could also be done in a transaction to keep things atomic)
-            await _companyRepository.AddAsync(company);
+        // Generate email verification token
+        var token = _tokenService.GenerateToken(company.Email, TokenType.EmailVerification.ToString());
 
-            // Generate the email verification token
-            var token = await _tokenService.GenerateTokenAsync(request.Email, TokenType.EmailVerification);
+        // Log the generated token
+        _logger.LogInformation("Generated email verification token for company {Email}: {Token}", company.Email, token);
 
-            // Send verification email with token via Email Verification Service
-            await _emailVerificationService.SendVerificationEmailAsync(request.Email, token);
+        // Call the EmailVerificationProvider to send the email
+        bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(request.Email, token);
 
-            // Return the SignUpResponse with a success flag, company info, and token
-            return new SignUpResponse
-            {
-                Success = true,
-                CompanyId = company.Id,
-                Token = token
-            };
+        if (!emailSent)
+        {
+            _logger.LogError("Failed to send verification email to {Email}.", request.Email);
+            throw new InvalidOperationException("Failed to send verification email.");
         }
+
+        _logger.LogInformation("Verification email successfully sent to {Email}.", request.Email);
+
+        return new SignUpResponse
+        {
+            Success = true,
+            CompanyId = company.Id,
+            Token = token
+        };
     }
 }

@@ -15,28 +15,29 @@ public class CompanyRepository : ICompanyRepository
         _context = context;
     }
 
+    // Check if a company exists by organisation number and email
     public async Task<bool> CompanyExistsAsync(string organisationNumber, string email)
     {
-        return await _context.Companies
-            .AnyAsync(c => c.OrganisationNumber == organisationNumber || c.Email == email);
+        return await _context.Set<Company>().AnyAsync(c => c.OrganisationNumber == organisationNumber && c.Email == email);
     }
 
-    public async Task<Company> GetCompanyByIdAsync(int companyId)
-    {
-        return await _context.Companies
-            .Include(c => c.Addresses)  // Load addresses if necessary
-            .FirstOrDefaultAsync(c => c.Id == companyId);
-    }
-
+    // Add a new company
     public async Task AddAsync(Company company)
     {
-        await _context.Companies.AddAsync(company);
+        await _context.Set<Company>().AddAsync(company);
         await _context.SaveChangesAsync();
     }
 
+    // Update an existing company
     public async Task UpdateAsync(Company company)
     {
-        _context.Companies.Update(company);
+        _context.Set<Company>().Update(company);
         await _context.SaveChangesAsync();
+    }
+
+    // Retrieve a company by email
+    public async Task<Company> GetByEmailAsync(string email)
+    {
+        return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
     }
 }
