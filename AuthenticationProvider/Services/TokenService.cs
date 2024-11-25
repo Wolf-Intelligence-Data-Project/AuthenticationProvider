@@ -5,28 +5,49 @@ using System.Text;
 
 namespace AuthenticationProvider.Services;
 
-public class TokenService(IConfiguration configuration) : ITokenService
+public class TokenService : ITokenService
 {
-    private readonly IConfiguration _configuration = configuration;
+    private readonly IConfiguration _configuration;
+
+    public TokenService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
 
     // Generate a token (used for both login session and email verification)
     public string GenerateToken(string email, string tokenType)
     {
         var claims = new[]
         {
-        new Claim(JwtRegisteredClaimNames.Sub, email),  // Storing email as 'sub' claim
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique ID for the token
-        new Claim("TokenType", tokenType)  // Custom claim to differentiate token types
-    };
+            new Claim(JwtRegisteredClaimNames.Sub, email),  // Storing email as 'sub' claim
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique ID for the token
+            new Claim("TokenType", tokenType)  // Custom claim to differentiate token types
+        };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        DateTime expirationTime;
+
+        // Set different expiration times based on the token type
+        if (tokenType == "EmailVerification")
+        {
+            expirationTime = DateTime.Now.AddDays(7);  // Email verification token expires in 7 days
+        }
+        else if (tokenType == "LoginSession")
+        {
+            expirationTime = DateTime.Now.AddHours(1);  // Login session token expires in 1 hour
+        }
+        else
+        {
+            expirationTime = DateTime.Now.AddHours(1);  // Default expiration time (for unknown token types)
+        }
 
         var token = new JwtSecurityToken(
             _configuration["Jwt:Issuer"],
             _configuration["Jwt:Issuer"],
             claims,
-            expires: DateTime.Now.AddHours(1),  // Expiration for the token
+            expires: expirationTime,
             signingCredentials: creds
         );
 
