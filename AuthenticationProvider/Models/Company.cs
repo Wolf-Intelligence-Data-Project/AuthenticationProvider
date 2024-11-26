@@ -1,10 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
 
 namespace AuthenticationProvider.Models;
 
 public class Company
 {
-    public int Id { get; set; }
+    [Key]
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     [Required]
     public string OrganisationNumber { get; set; } = string.Empty;
@@ -17,7 +19,7 @@ public class Company
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    public BusinessType BusinessType { get; set; } = BusinessType.Unspecified;  // Default value for enum
+    public BusinessType BusinessType { get; set; } = BusinessType.Unspecified;
 
     [Required]
     public string ResponsiblePersonName { get; set; } = string.Empty;
@@ -31,10 +33,10 @@ public class Company
     public bool TermsAndConditions { get; set; }
 
     [Required]
-    public int PrimaryAddressId { get; set; }  
+    public int PrimaryAddressId { get; set; }
 
-    [Required]
-    public Address PrimaryAddress { get; set; } = new Address(); // Ensures PrimaryAddress is initialized
+    [ForeignKey("PrimaryAddressId")]
+    public Address PrimaryAddress { get; set; } = new Address();
 
-    public ICollection<Address> Addresses { get; set; } = new List<Address>();  // Initializes the collection to avoid null reference
+    public ICollection<Address> Addresses { get; set; } = new List<Address>();
 }

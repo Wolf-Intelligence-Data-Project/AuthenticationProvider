@@ -55,10 +55,10 @@ public class AddressRepository : IAddressRepository
     }
 
     // Get all addresses for a specific company
-    public async Task<ICollection<Address>> GetAddressesByCompanyIdAsync(int companyId)
+    public async Task<ICollection<Address>> GetAddressesByCompanyIdAsync(Guid companyId)  // Update to use Guid for companyId
     {
         return await _dbContext.Addresses
-                               .Where(a => a.CompanyId == companyId)
+                               .Where(a => a.CompanyId == companyId)  // Correct comparison with Guid
                                .ToListAsync();
     }
 
@@ -80,5 +80,4 @@ public class AddressRepository : IAddressRepository
         _dbContext.Addresses.Update(address);
         await _dbContext.SaveChangesAsync();
     }
-
 }

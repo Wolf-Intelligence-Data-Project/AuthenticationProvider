@@ -19,7 +19,7 @@ public class Address
     public string Region { get; set; }
 
     [Required]
-    public int CompanyId { get; set; }
+    public Guid CompanyId { get; set; }
 
     public Company Company { get; set; }
 
