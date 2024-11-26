@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using AuthenticationProvider.Data;
 using AuthenticationProvider.Models;
+using System.Linq;
 
 namespace AuthenticationProvider.Repositories;
 
@@ -17,6 +18,30 @@ public class AddressRepository : IAddressRepository
     // Add a new address to the database
     public async Task AddAsync(Address address)
     {
+        // Ensure address uniqueness: Same street address, postal code, and city should not exist.
+        bool isAddressUnique = !await _dbContext.Addresses
+            .AnyAsync(a => a.StreetAddress == address.StreetAddress
+                           && a.PostalCode == address.PostalCode
+                           && a.City == address.City);
+
+        if (!isAddressUnique)
+        {
+            throw new InvalidOperationException("Adressen existerar redan i systemet.");  // "The address already exists in the system."
+        }
+
+        // If adding primary address, check if company already has a primary address
+        if (address.AddressType == "Primary")
+        {
+            bool hasPrimaryAddress = await _dbContext.Addresses
+                .AnyAsync(a => a.CompanyId == address.CompanyId && a.AddressType == "Primary");
+
+            if (hasPrimaryAddress)
+            {
+                throw new InvalidOperationException("Företaget har redan en primäradress.");  // "The company already has a primary address."
+            }
+        }
+
+        // Add the address to the database
         await _dbContext.AddAsync(address);
         await _dbContext.SaveChangesAsync();
     }
@@ -40,18 +65,20 @@ public class AddressRepository : IAddressRepository
     // Update an existing address
     public async Task UpdateAsync(Address address)
     {
+        // If updating to Primary address, ensure no other primary address exists
+        if (address.AddressType == "Primary")
+        {
+            bool hasPrimaryAddress = await _dbContext.Addresses
+                .AnyAsync(a => a.CompanyId == address.CompanyId && a.AddressType == "Primary" && a.Id != address.Id);
+
+            if (hasPrimaryAddress)
+            {
+                throw new InvalidOperationException("Företaget har redan en primäradress.");  // "The company already has a primary address."
+            }
+        }
+
         _dbContext.Addresses.Update(address);
         await _dbContext.SaveChangesAsync();
     }
 
-    // Delete an address by its ID
-    public async Task DeleteAsync(int id)
-    {
-        var address = await _dbContext.Addresses.FindAsync(id);
-        if (address != null)
-        {
-            _dbContext.Addresses.Remove(address);
-            await _dbContext.SaveChangesAsync();
-        }
-    }
 }

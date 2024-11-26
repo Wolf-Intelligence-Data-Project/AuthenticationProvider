@@ -8,22 +8,16 @@ namespace AuthenticationProvider.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SignUpController : ControllerBase
+public class SignUpController(ISignUpService signUpService) : ControllerBase
 {
-    private readonly ISignUpService _signUpService;
-
-    public SignUpController(ISignUpService signUpService)
-    {
-        _signUpService = signUpService;
-    }
+    private readonly ISignUpService _signUpService = signUpService;
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] SignUpRequest request)
     {
-        // Check for validation errors in the incoming request model
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState); // Return validation errors as part of the response
+            return BadRequest(ModelState);  // Return validation errors
         }
 
         try
@@ -33,9 +27,8 @@ public class SignUpController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Return a generic error message for exceptions
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new { message = ex.Message });  // Handle other exceptions
         }
     }
-
 }
+

@@ -1,9 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using AuthenticationProvider.Services;
-using System.Threading.Tasks;
-using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models.SignIn;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -23,13 +20,18 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] SignInRequest request)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState); // If model is invalid, return validation errors
+        }
+
         var response = await _signInService.SignInAsync(request);
         if (response.Success)
         {
             return Ok(new { Token = response.Token });
         }
 
-        return Unauthorized(response.ErrorMessage);
+        return Unauthorized("Felaktiga inloggningsuppgifter."); // Translation for error message
     }
 
     [HttpPost("logout")]
@@ -37,16 +39,15 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrEmpty(token))
         {
-            return BadRequest("Token is required for logout.");
+            return BadRequest("Token krävs för utloggning."); // Translation for missing token message
         }
 
         var result = await _signOutService.SignOutAsync(token);
         if (result)
         {
-            return Ok("Successfully logged out.");
+            return Ok("Utloggning lyckades."); // Translation for successful logout
         }
 
-        return BadRequest("Failed to log out. Token might already be invalid or missing.");
+        return BadRequest("Misslyckades med att logga ut. Token kan redan vara ogiltig eller saknas."); // Translation for logout failure
     }
-
 }

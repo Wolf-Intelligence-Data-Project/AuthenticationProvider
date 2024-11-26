@@ -17,6 +17,4 @@ public interface IAddressRepository
     // Update an existing address
     Task UpdateAsync(Address address);
 
-    // Delete an address by its ID
-    Task DeleteAsync(int id);
 }

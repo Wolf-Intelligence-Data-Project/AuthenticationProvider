@@ -3,7 +3,6 @@ using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using JwtRegisteredClaimNames = Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -19,37 +18,34 @@ public class EmailVerificationController(ICompanyRepository companyRepository, I
     {
         if (string.IsNullOrEmpty(token))
         {
-            return BadRequest("Token is required.");
+            return BadRequest("Token krävs.");
         }
 
         // Validate the token
         var claimsPrincipal = _tokenService.ValidateToken(token);
         if (claimsPrincipal == null)
         {
-            return BadRequest("Invalid or expired token.");
+            return BadRequest("Ogiltigt eller utgånget token."); 
         }
 
-        // Extract email using different methods
         string email = ExtractEmailFromToken(token) ??
                        ExtractEmailFromClaimsPrincipal(claimsPrincipal);
 
         if (string.IsNullOrEmpty(email))
         {
-            return BadRequest("Email not found in token.");
+            return BadRequest("E-postadress hittades inte i token.");
         }
 
-        // Fetch the company using the email
         var company = await _companyRepository.GetByEmailAsync(email);
-
         if (company == null)
         {
-            return BadRequest("No company found with the provided email.");
+            return BadRequest("Inget företag hittades med den angivna e-postadressen."); 
         }
 
         company.IsVerified = true;
         await _companyRepository.UpdateAsync(company);
 
-        return Ok("Your email has been successfully verified.");
+        return Ok("Din e-postadress har verifierats framgångsrikt.");
     }
 
     private string ExtractEmailFromToken(string token)
@@ -63,7 +59,7 @@ public class EmailVerificationController(ICompanyRepository companyRepository, I
     private string ExtractEmailFromClaimsPrincipal(ClaimsPrincipal claimsPrincipal)
     {
         return claimsPrincipal?.Claims
-            .FirstOrDefault(c => c.Type.Equals("sub", System.StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(c => c.Type.Equals("sub", StringComparison.OrdinalIgnoreCase))
             ?.Value;
     }
 }
