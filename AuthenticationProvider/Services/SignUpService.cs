@@ -2,6 +2,7 @@
 using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models.Tokens;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
@@ -13,6 +14,7 @@ public class SignUpService : ISignUpService
     private readonly ITokenService _tokenService;
     private readonly IEmailVerificationService _emailVerificationService;
     private readonly ILogger<SignUpService> _logger;
+    private readonly PasswordHasher<Company> _passwordHasher;
 
     public SignUpService(
         ICompanyRepository companyRepository,
@@ -24,6 +26,7 @@ public class SignUpService : ISignUpService
         _tokenService = tokenService;
         _emailVerificationService = emailVerificationService;
         _logger = logger;
+        _passwordHasher = new PasswordHasher<Company>();  // Initialize PasswordHasher
     }
 
     public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
@@ -83,6 +86,9 @@ public class SignUpService : ISignUpService
             throw new InvalidOperationException("Passwords do not match.");
         }
 
+        // Hash the password before saving
+        string hashedPassword = _passwordHasher.HashPassword(null, request.Password);  // Use null for the object parameter
+
         // Create new company object
         var company = new Company
         {
@@ -93,9 +99,9 @@ public class SignUpService : ISignUpService
             ResponsiblePersonName = request.ResponsiblePersonName,
             PhoneNumber = request.PhoneNumber,
             TermsAndConditions = request.TermsAndConditions,
-            IsVerified = false // Initially false
+            IsVerified = false, // Initially false
+            PasswordHash = hashedPassword // Save the hashed password
         };
-
 
         // Add company to the repository (database)
         await _companyRepository.AddAsync(company);

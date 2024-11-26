@@ -1,6 +1,5 @@
 ﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models.SignUp;
-using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
@@ -8,9 +7,14 @@ namespace AuthenticationProvider.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SignUpController(ISignUpService signUpService) : ControllerBase
+public class SignUpController : ControllerBase
 {
-    private readonly ISignUpService _signUpService = signUpService;
+    private readonly ISignUpService _signUpService;
+
+    public SignUpController(ISignUpService signUpService)
+    {
+        _signUpService = signUpService;
+    }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] SignUpRequest request)
@@ -31,4 +35,3 @@ public class SignUpController(ISignUpService signUpService) : ControllerBase
         }
     }
 }
-

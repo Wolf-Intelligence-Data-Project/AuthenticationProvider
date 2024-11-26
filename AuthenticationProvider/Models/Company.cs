@@ -39,4 +39,8 @@ public class Company
     public Address PrimaryAddress { get; set; } = new Address();
 
     public ICollection<Address> Addresses { get; set; } = new List<Address>();
+
+    // This is where you store the hashed password
+    [Required]
+    public string PasswordHash { get; set; } = string.Empty;
 }
