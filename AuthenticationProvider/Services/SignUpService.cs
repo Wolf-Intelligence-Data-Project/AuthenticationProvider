@@ -1,5 +1,6 @@
 ﻿using AuthenticationProvider.Entities;
-using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models.Tokens;

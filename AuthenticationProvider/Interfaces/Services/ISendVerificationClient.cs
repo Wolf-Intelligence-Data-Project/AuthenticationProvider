@@ -1,4 +1,4 @@
-﻿namespace AuthenticationProvider.Interfaces;
+﻿namespace AuthenticationProvider.Interfaces.Services;
 
 public interface ISendVerificationClient
 {

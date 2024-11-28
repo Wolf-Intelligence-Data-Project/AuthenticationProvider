@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models.SignUp;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;

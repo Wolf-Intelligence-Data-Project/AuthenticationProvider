@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models.SignIn;
 using Microsoft.AspNetCore.Mvc;
 

@@ -2,7 +2,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Repositories;
 
 public interface ICompanyRepository
 {

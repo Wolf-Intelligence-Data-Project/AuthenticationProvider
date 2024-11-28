@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignIn;
+﻿using AuthenticationProvider.Models.SignIn;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using AuthenticationProvider.Interfaces.Services;
 
 namespace AuthenticationProvider.Controllers;
 

@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Interfaces;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using AuthenticationProvider.Data;
 using System.Linq;
 using AuthenticationProvider.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 
 namespace AuthenticationProvider.Repositories;
 

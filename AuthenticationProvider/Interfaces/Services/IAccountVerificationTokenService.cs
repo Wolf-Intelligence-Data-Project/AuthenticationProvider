@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Services;
 
 public interface IAccountVerificationTokenService
 {

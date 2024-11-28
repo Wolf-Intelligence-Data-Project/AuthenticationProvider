@@ -1,4 +1,5 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 using Microsoft.Extensions.Logging;
 
 namespace AuthenticationProvider.Services;

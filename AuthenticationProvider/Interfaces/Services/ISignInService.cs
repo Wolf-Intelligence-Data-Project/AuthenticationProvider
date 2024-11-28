@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
 using AuthenticationProvider.Models.SignIn;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Services;
 
 public interface ISignInService
 {

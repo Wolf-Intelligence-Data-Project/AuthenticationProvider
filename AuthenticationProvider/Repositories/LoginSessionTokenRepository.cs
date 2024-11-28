@@ -1,5 +1,5 @@
 ﻿using AuthenticationProvider.Data;
-using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;

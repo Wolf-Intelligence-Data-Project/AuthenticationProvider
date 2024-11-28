@@ -1,6 +1,7 @@
-﻿using AuthenticationProvider.Interfaces;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Logging;
+using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 
 namespace AuthenticationProvider.Services;
 

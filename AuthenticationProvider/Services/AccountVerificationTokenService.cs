@@ -1,4 +1,5 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace AuthenticationProvider.Services;

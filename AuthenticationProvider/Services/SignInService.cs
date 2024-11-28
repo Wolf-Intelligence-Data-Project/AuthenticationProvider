@@ -1,9 +1,9 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignIn;
+﻿using AuthenticationProvider.Models.SignIn;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models;
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
+using AuthenticationProvider.Interfaces.Services;
 
 namespace AuthenticationProvider.Services;
 
