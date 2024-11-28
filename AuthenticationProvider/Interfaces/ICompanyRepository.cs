@@ -1,36 +1,38 @@
-﻿using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Entities;
+using System;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Interfaces;
 
 public interface ICompanyRepository
 {
-    /// <summary>
-    /// Checks if a company exists based on organisation number and email.
-    /// </summary>
-    /// <param name="organisationNumber">The organisation number of the company.</param>
-    /// <param name="email">The email of the company.</param>
-    /// <returns>True if the company exists, otherwise false.</returns>
+    // Check if a company exists by organisation number and email
     Task<bool> CompanyExistsAsync(string organisationNumber, string email);
 
-    /// <summary>
-    /// Adds a new company to the database.
-    /// </summary>
-    /// <param name="company">The company to add.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
+    // Add a new company
     Task AddAsync(Company company);
 
-    /// <summary>
-    /// Updates an existing company's details in the database.
-    /// </summary>
-    /// <param name="company">The company to update.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
+    // Update an existing company
     Task UpdateAsync(Company company);
 
-    /// <summary>
-    /// Retrieves a company by its email address.
-    /// </summary>
-    /// <param name="email">The email address to search for.</param>
-    /// <returns>The company if found, otherwise null.</returns>
+    // Retrieve a company by email
     Task<Company> GetByEmailAsync(string email);
+
+    // Retrieve a company by organisation number
+    Task<Company> GetByOrganisationNumberAsync(string organisationNumber);
+
+    // Retrieve a company by GUID (Id)
+    Task<Company> GetByGuidAsync(Guid companyId);
+
+    // Retrieve the last email verification token for a company
+    Task<string> GetLastEmailVerificationTokenAsync(string email);
+
+    // Update the email verification token for a company
+    Task UpdateEmailVerificationTokenAsync(string email, string token);
+
+    // Get a company for email verification
+    Task<Company> GetCompanyForVerificationAsync(string email);
+
+    // Revoke email verification token for a company
+    Task RevokeEmailVerificationTokenAsync(string email);
 }

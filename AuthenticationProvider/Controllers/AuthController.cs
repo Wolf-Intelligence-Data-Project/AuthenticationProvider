@@ -22,7 +22,7 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState); // If model is invalid, return validation errors
+            return BadRequest(ModelState); // Return validation errors
         }
 
         var response = await _signInService.SignInAsync(request);

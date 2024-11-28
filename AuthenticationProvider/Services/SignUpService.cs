@@ -1,32 +1,35 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Entities;
+using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models.Tokens;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Services;
 
 public class SignUpService : ISignUpService
 {
     private readonly ICompanyRepository _companyRepository;
-    private readonly ITokenService _tokenService;
-    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly IAccountVerificationTokenService _accountVerificationTokenService;
+    private readonly ISendVerificationService _emailVerificationService;
     private readonly ILogger<SignUpService> _logger;
     private readonly PasswordHasher<Company> _passwordHasher;
 
     public SignUpService(
         ICompanyRepository companyRepository,
-        ITokenService tokenService,
-        IEmailVerificationService emailVerificationService,
+        IAccountVerificationTokenService accountVerificationTokenService,
+        ISendVerificationService emailVerificationService,
         ILogger<SignUpService> logger)
     {
         _companyRepository = companyRepository;
-        _tokenService = tokenService;
+        _accountVerificationTokenService = accountVerificationTokenService;
         _emailVerificationService = emailVerificationService;
         _logger = logger;
-        _passwordHasher = new PasswordHasher<Company>();  // Initialize PasswordHasher
+        _passwordHasher = new PasswordHasher<Company>(); // Initialize PasswordHasher
     }
 
     public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
@@ -43,7 +46,7 @@ public class SignUpService : ISignUpService
             throw new InvalidOperationException("Invalid email format.");
         }
 
-        // Check for email uniqueness (if already registered)
+        // Check for email or organisation number uniqueness (if already registered)
         if (await _companyRepository.CompanyExistsAsync(request.OrganisationNumber, request.Email))
         {
             throw new InvalidOperationException("Company with the provided Organisation Number or Email already exists.");
@@ -87,7 +90,7 @@ public class SignUpService : ISignUpService
         }
 
         // Hash the password before saving
-        string hashedPassword = _passwordHasher.HashPassword(null, request.Password);  // Use null for the object parameter
+        string hashedPassword = _passwordHasher.HashPassword(null, request.Password); // Use null for the object parameter
 
         // Create new company object
         var company = new Company
@@ -107,9 +110,9 @@ public class SignUpService : ISignUpService
         await _companyRepository.AddAsync(company);
 
         // Generate email verification token
-        var token = _tokenService.GenerateToken(company.Email, TokenType.EmailVerification.ToString());
+        var token = await _accountVerificationTokenService.GenerateVerificationTokenAsync(company.Id);
 
-        // Call the EmailVerificationProvider to send the email
+        // Call the EmailVerificationService to send the email
         bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(token);
 
         if (!emailSent)

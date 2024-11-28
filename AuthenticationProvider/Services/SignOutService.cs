@@ -1,55 +1,33 @@
 ﻿using AuthenticationProvider.Interfaces;
-using Microsoft.Extensions.Caching.Memory;
-using System;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace AuthenticationProvider.Services;
 
 public class SignOutService : ISignOutService
 {
-    private readonly IMemoryCache _cache;
+    private readonly ICompanyRepository _companyRepository;
+    private readonly ILogger<SignOutService> _logger;
 
-    public SignOutService(IMemoryCache cache)
+    public SignOutService(ICompanyRepository companyRepository, ILogger<SignOutService> logger)
     {
-        _cache = cache;
+        _companyRepository = companyRepository;
+        _logger = logger;
     }
-    public async Task<bool> SignOutAsync(string token)
+
+    public async Task<bool> SignOutAsync(string email)
     {
-        if (string.IsNullOrEmpty(token))
+        // Perform logout-related actions like clearing session, cookies, etc.
+        var company = await _companyRepository.GetByEmailAsync(email);
+        if (company == null)
         {
-            return false; // Token is required for sign-out
+            return false; // Company not found, can't sign out
         }
 
-        try
-        {
-            // Add the token to a blacklist cache with an expiration equal to its remaining validity period
-            var expiration = GetTokenExpiration(token);
-            if (expiration.HasValue)
-            {
-                _cache.Set(token, true, expiration.Value - DateTime.UtcNow);
-            }
-            else
-            {
-                // If token expiration cannot be determined, use a default short lifespan
-                _cache.Set(token, true, TimeSpan.FromHours(1));
-            }
+        // Revoke login session token as part of sign-out process
+        company.LastLoginSessionToken = string.Empty;
+        await _companyRepository.UpdateAsync(company);
 
-            return await Task.FromResult(true); // Successfully blacklisted
-        }
-        catch
-        {
-            return false; // An error occurred
-        }
-    }
-    private DateTime? GetTokenExpiration(string token)
-    {
-        var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-        if (!handler.CanReadToken(token))
-        {
-            return null; // Invalid token format
-        }
-
-        var jwtToken = handler.ReadJwtToken(token);
-        return jwtToken.ValidTo; // Return the expiration time (UTC)
+        _logger.LogInformation($"User logged out: {company.CompanyName}, Email: {email}");
+        return true;
     }
 }

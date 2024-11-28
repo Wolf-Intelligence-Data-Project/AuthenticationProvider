@@ -29,9 +29,20 @@ public class SignUpController : ControllerBase
             var response = await _signUpService.RegisterCompanyAsync(request);
             return Ok(response); // Successfully registered
         }
+        catch (ArgumentException ex)
+        {
+            // Catch specific argument-related errors
+            return BadRequest(new { message = $"Felaktiga argument: {ex.Message}" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Handle operation-specific exceptions
+            return BadRequest(new { message = $"Ogiltig operation: {ex.Message}" });
+        }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });  // Handle other exceptions
+            // Catch other unexpected exceptions
+            return StatusCode(500, new { message = $"Ett oväntat fel inträffade: {ex.Message}" });
         }
     }
 }

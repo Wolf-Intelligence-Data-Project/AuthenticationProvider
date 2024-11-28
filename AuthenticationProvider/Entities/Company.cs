@@ -1,7 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using AuthenticationProvider.Models;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AuthenticationProvider.Models;
+namespace AuthenticationProvider.Entities;
 
 public class Company
 {
@@ -30,7 +31,7 @@ public class Company
     public bool IsVerified { get; set; } = false;
 
     [Required]
-    public bool TermsAndConditions { get; set; }
+    public bool TermsAndConditions { get; set; } // Consent to terms
 
     [Required]
     public int PrimaryAddressId { get; set; }
@@ -40,7 +41,10 @@ public class Company
 
     public ICollection<Address> Addresses { get; set; } = new List<Address>();
 
-    // This is where you store the hashed password
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
+
+    // Tokens for email verification and login session
+    public string LastEmailVerificationToken { get; set; } = string.Empty;
+    public string LastLoginSessionToken { get; set; } = string.Empty; // To store the last login session token
 }

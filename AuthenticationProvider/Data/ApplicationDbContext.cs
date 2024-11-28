@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthenticationProvider.Data;
@@ -24,6 +24,4 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey<Company>(c => c.PrimaryAddressId)
             .OnDelete(DeleteBehavior.SetNull);
     }
-
-
 }

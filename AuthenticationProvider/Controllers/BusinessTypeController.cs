@@ -7,15 +7,21 @@ namespace AuthenticationProvider.Controllers;
 [ApiController]
 public class BusinessTypeController : ControllerBase
 {
-    // GET: api/businessType
     [HttpGet]
     public IActionResult GetBusinessTypes()
     {
-        var businessTypes = Enum.GetValues(typeof(BusinessType))
-                                .Cast<BusinessType>()
-                                .Select(e => new { Value = e.ToString(), DisplayName = e.ToString() })
-                                .ToList();
+        try
+        {
+            var businessTypes = Enum.GetValues(typeof(BusinessType))
+                                    .Cast<BusinessType>()
+                                    .Select(e => new { Value = e.ToString(), DisplayName = e.ToString() })
+                                    .ToList();
 
-        return Ok(businessTypes);
+            return Ok(businessTypes);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Ett oväntat fel inträffade: {ex.Message}");
+        }
     }
 }
