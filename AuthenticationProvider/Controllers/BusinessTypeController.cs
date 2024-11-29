@@ -1,5 +1,6 @@
 ﻿using AuthenticationProvider.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -14,7 +15,15 @@ public class BusinessTypeController : ControllerBase
         {
             var businessTypes = Enum.GetValues(typeof(BusinessType))
                                     .Cast<BusinessType>()
-                                    .Select(e => new { Value = e.ToString(), DisplayName = e.ToString() })
+                                    .Select(e => new
+                                    {
+                                        Value = e.ToString(),
+                                        DisplayName = e.GetType()
+                                                       .GetField(e.ToString())
+                                                       .GetCustomAttributes(typeof(DisplayAttribute), false)
+                                                       .Cast<DisplayAttribute>()
+                                                       .FirstOrDefault()?.Name ?? e.ToString()
+                                    })
                                     .ToList();
 
             return Ok(businessTypes);
@@ -24,4 +33,5 @@ public class BusinessTypeController : ControllerBase
             return StatusCode(500, $"Ett oväntat fel inträffade: {ex.Message}");
         }
     }
+
 }
