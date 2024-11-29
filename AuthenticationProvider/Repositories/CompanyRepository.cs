@@ -2,8 +2,8 @@
 using AuthenticationProvider.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Repositories;
@@ -11,107 +11,178 @@ namespace AuthenticationProvider.Repositories;
 public class CompanyRepository : ICompanyRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<CompanyRepository> _logger;
 
-    public CompanyRepository(ApplicationDbContext context)
+    public CompanyRepository(ApplicationDbContext context, ILogger<CompanyRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
-    // Check if a company exists by organisation number and email
     public async Task<bool> CompanyExistsAsync(string organisationNumber, string email)
     {
-        return await _context.Set<Company>().AnyAsync(c => c.OrganisationNumber == organisationNumber && c.Email == email);
+        try
+        {
+            return await _context.Set<Company>().AnyAsync(c => c.OrganisationNumber == organisationNumber && c.Email == email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking if company exists.");
+            throw new InvalidOperationException("An error occurred while checking company existence.");
+        }
     }
 
-    // Add a new company
     public async Task AddAsync(Company company)
     {
-        bool companyExists = await _context.Set<Company>()
-            .AnyAsync(c => c.OrganisationNumber == company.OrganisationNumber && c.Email == company.Email);
-
-        if (companyExists)
+        try
         {
-            throw new InvalidOperationException("Företaget med samma organisationsnummer och e-postadress existerar redan.");
-        }
+            bool companyExists = await _context.Set<Company>()
+                .AnyAsync(c => c.OrganisationNumber == company.OrganisationNumber && c.Email == company.Email);
 
-        await _context.Set<Company>().AddAsync(company);
-        await _context.SaveChangesAsync();  // Save changes here
+            if (companyExists)
+            {
+                throw new InvalidOperationException("Företaget med samma organisationsnummer och e-postadress existerar redan.");
+            }
+
+            await _context.Set<Company>().AddAsync(company);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding a company.");
+            throw new InvalidOperationException("An error occurred while adding the company.");
+        }
     }
 
-    // Update an existing company
     public async Task UpdateAsync(Company company)
     {
-        var existingCompany = await _context.Set<Company>().FindAsync(company.Id);
-
-        if (existingCompany == null)
+        try
         {
-            throw new InvalidOperationException("Företaget finns inte.");
-        }
+            var existingCompany = await _context.Set<Company>().FindAsync(company.Id);
 
-        _context.Set<Company>().Update(company);
-        await _context.SaveChangesAsync();  // Save changes here
+            if (existingCompany == null)
+            {
+                throw new InvalidOperationException("Företaget finns inte.");
+            }
+
+            _context.Set<Company>().Update(company);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating a company.");
+            throw new InvalidOperationException("An error occurred while updating the company.");
+        }
     }
 
-    // Retrieve a company by email
     public async Task<Company> GetByEmailAsync(string email)
     {
-        return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
+        try
+        {
+            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving company by email.");
+            throw new InvalidOperationException("An error occurred while retrieving the company.");
+        }
     }
 
-    // Retrieve a company by organisation number
     public async Task<Company> GetByOrganisationNumberAsync(string organisationNumber)
     {
-        return await _context.Set<Company>().FirstOrDefaultAsync(c => c.OrganisationNumber == organisationNumber);
+        try
+        {
+            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.OrganisationNumber == organisationNumber);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving company by organisation number.");
+            throw new InvalidOperationException("An error occurred while retrieving the company.");
+        }
     }
 
-    // Retrieve a company by GUID (Id)
     public async Task<Company> GetByGuidAsync(Guid companyId)
     {
-        return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId);
+        try
+        {
+            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving company by GUID.");
+            throw new InvalidOperationException("An error occurred while retrieving the company.");
+        }
     }
 
-    // Retrieve the last email verification token for a company
     public async Task<string> GetLastEmailVerificationTokenAsync(string email)
     {
-        var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
-
-        return company?.LastEmailVerificationToken;
+        try
+        {
+            var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
+            return company?.LastEmailVerificationToken;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving last email verification token.");
+            throw new InvalidOperationException("An error occurred while retrieving the email verification token.");
+        }
     }
 
-    // Update the email verification token for a company
     public async Task UpdateEmailVerificationTokenAsync(string email, string token)
     {
-        var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
-
-        if (company == null)
+        try
         {
-            throw new InvalidOperationException("Företag med denna e-postadress hittades inte.");
-        }
+            var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
 
-        company.LastEmailVerificationToken = token;
-        _context.Set<Company>().Update(company);
-        await _context.SaveChangesAsync();  // Save changes here
+            if (company == null)
+            {
+                throw new InvalidOperationException("Företag med denna e-postadress hittades inte.");
+            }
+
+            company.LastEmailVerificationToken = token;
+            _context.Set<Company>().Update(company);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating email verification token.");
+            throw new InvalidOperationException("An error occurred while updating the email verification token.");
+        }
     }
 
-    // Get a company for email verification
     public async Task<Company> GetCompanyForVerificationAsync(string email)
     {
-        return await _context.Set<Company>()
-            .FirstOrDefaultAsync(c => c.Email == email && c.LastEmailVerificationToken != null);
+        try
+        {
+            return await _context.Set<Company>()
+                .FirstOrDefaultAsync(c => c.Email == email && c.LastEmailVerificationToken != null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving company for verification.");
+            throw new InvalidOperationException("An error occurred while retrieving the company for verification.");
+        }
     }
 
-    // Revoke email verification token for a company
     public async Task RevokeEmailVerificationTokenAsync(string email)
     {
-        var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
-
-        if (company == null)
+        try
         {
-            throw new InvalidOperationException("Företag med denna e-postadress hittades inte.");
-        }
+            var company = await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
 
-        company.LastEmailVerificationToken = null;
-        _context.Set<Company>().Update(company);
-        await _context.SaveChangesAsync();  // Save changes here
+            if (company == null)
+            {
+                throw new InvalidOperationException("Företag med denna e-postadress hittades inte.");
+            }
+
+            company.LastEmailVerificationToken = null;
+            _context.Set<Company>().Update(company);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking email verification token.");
+            throw new InvalidOperationException("An error occurred while revoking the email verification token.");
+        }
     }
 }

@@ -17,18 +17,28 @@ public class SignOutService : ISignOutService
 
     public async Task<bool> SignOutAsync(string email)
     {
-        // Perform logout-related actions like clearing session, cookies, etc.
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null)
+        try
         {
-            return false; // Company not found, can't sign out
+            // Perform logout-related actions like clearing session, cookies, etc.
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null)
+            {
+                _logger.LogWarning("Company not found.");
+                return false; // Company not found, can't sign out
+            }
+
+            // Revoke login session token as part of sign-out process
+            company.LastLoginSessionToken = string.Empty;
+            await _companyRepository.UpdateAsync(company);
+
+            _logger.LogInformation($"User logged out: {company.CompanyName}");
+            return true;
         }
-
-        // Revoke login session token as part of sign-out process
-        company.LastLoginSessionToken = string.Empty;
-        await _companyRepository.UpdateAsync(company);
-
-        _logger.LogInformation($"User logged out: {company.CompanyName}, Email: {email}");
-        return true;
+        catch (Exception ex)
+        {
+            // Log the error message without exposing sensitive information
+            _logger.LogError($"Error occurred during sign-out process. Error: {ex.Message}");
+            throw new InvalidOperationException("Det uppstod ett problem vid utloggning. Försök igen senare.", ex); // User-friendly message in Swedish
+        }
     }
 }
