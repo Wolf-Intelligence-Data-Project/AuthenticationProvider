@@ -1,7 +1,12 @@
-﻿namespace AuthenticationProvider.Models.Tokens;
+﻿using System.ComponentModel.DataAnnotations;
 
 public class JwtSettings
 {
-    public string Key { get; set; } = null!;
-    public string Issuer { get; set; } = null!;
+    [Required]
+    public string Key { get; set; }
+
+    [Required]
+    public string Issuer { get; set; }
+
+    public string Audience { get; set; }
 }

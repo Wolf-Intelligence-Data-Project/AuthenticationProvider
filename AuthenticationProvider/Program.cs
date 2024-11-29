@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,8 +26,6 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
-
-// Register services
 
 // Register core services
 builder.Services.AddScoped<ISignOutService, SignOutService>();
@@ -47,14 +46,36 @@ builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerification
 builder.Services.AddScoped<ISendVerificationService, SendVerificationService>();
 builder.Services.AddSingleton<ISendVerificationClient, SendVerificationClient>();
 
-// Register JwtSettings configuration
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-
 // Register HttpClient for the EmailVerificationClient
 builder.Services.AddHttpClient<SendVerificationClient>(client =>
 {
     var emailVerificationUrl = builder.Configuration.GetValue<string>("ExternalServices:EmailVerificationUrl");
     client.BaseAddress = new Uri(emailVerificationUrl);
+});
+
+// Retrieve JWT settings for Authentication and Verification from appsettings.json
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+
+    // Authentication JWT settings
+    var authenticationJwtSettings = new JwtSettings
+    {
+        Key = config["Jwt:Authentication:Key"],
+        Issuer = config["Jwt:Authentication:Issuer"],
+        Audience = config["Jwt:Authentication:Audience"] // Optional, remove if not required
+    };
+
+    // Verification JWT settings (if used separately)
+    var verificationJwtSettings = new JwtSettings
+    {
+        Key = config["Jwt:Verification:Key"],
+        Issuer = config["Jwt:Verification:Issuer"],
+        Audience = config["Jwt:Verification:Audience"] // Optional, remove if not required
+    };
+
+    // Return authentication settings, or both if you want to use both
+    return new { AuthenticationJwtSettings = authenticationJwtSettings, VerificationJwtSettings = verificationJwtSettings };
 });
 
 // Add controllers

@@ -1,101 +1,160 @@
 ﻿using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace AuthenticationProvider.Services;
 
 public class AccountVerificationTokenService : IAccountVerificationTokenService
 {
-    private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
+    private readonly IAccountVerificationTokenRepository _tokenRepository;
     private readonly ICompanyRepository _companyRepository;
     private readonly ILogger<AccountVerificationTokenService> _logger;
+    private readonly IConfiguration _configuration; // Inject IConfiguration
 
     public AccountVerificationTokenService(
         IAccountVerificationTokenRepository tokenRepository,
         ICompanyRepository companyRepository,
-        ILogger<AccountVerificationTokenService> logger)
+        ILogger<AccountVerificationTokenService> logger,
+        IConfiguration configuration)
     {
-        _accountVerificationTokenRepository = tokenRepository;
+        _tokenRepository = tokenRepository;
         _companyRepository = companyRepository;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task<string> GenerateVerificationTokenAsync(Guid companyId)
     {
-        if (companyId == Guid.Empty)
+        try
         {
-            throw new ArgumentException("Företags-ID är tomt.");
-        }
+            if (companyId == Guid.Empty)
+            {
+                throw new ArgumentException("Company ID is empty.");
+            }
 
-        var company = await _companyRepository.GetByGuidAsync(companyId);
-        if (company != null && company.IsVerified)
+            var company = await _companyRepository.GetByGuidAsync(companyId);
+            if (company != null && company.IsVerified)
+            {
+                throw new InvalidOperationException("The company is already verified.");
+            }
+
+            await RevokeVerificationTokenAsync(companyId); // Revoke any existing token
+
+            var token = GenerateNewToken(companyId);
+            await _tokenRepository.SaveEmailVerificationTokenAsync(companyId, token);
+
+            _logger.LogInformation("Verification token generated successfully.");
+            return token;
+        }
+        catch (Exception ex)
         {
-            throw new InvalidOperationException("Företaget är redan verifierat.");
+            _logger.LogError(ex, "An error occurred while generating verification token.");
+            throw;
         }
-
-        await RevokeVerificationTokenAsync(companyId); // Revoke any existing token
-
-        var token = GenerateNewToken(companyId); // Implement this method to generate the token
-        await _accountVerificationTokenRepository.SaveEmailVerificationTokenAsync(companyId, token);
-
-        _logger.LogInformation($"Verifieringstoken genererad för Företags-ID: {companyId}");
-        return token;
     }
 
     public async Task<bool> RevokeVerificationTokenAsync(Guid companyId)
     {
-        if (companyId == Guid.Empty)
+        try
         {
-            _logger.LogWarning("Försökte återkalla token för ett tomt Företags-ID.");
-            return false;
-        }
+            if (companyId == Guid.Empty)
+            {
+                _logger.LogWarning("Attempted to revoke token for an empty Company ID.");
+                return false;
+            }
 
-        var company = await _companyRepository.GetByGuidAsync(companyId);
-        if (company != null && company.IsVerified)
+            var company = await _companyRepository.GetByGuidAsync(companyId);
+            if (company != null && company.IsVerified)
+            {
+                throw new InvalidOperationException("The company is already verified.");
+            }
+
+            var token = await _tokenRepository.GetLastEmailVerificationTokenAsync(companyId);
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No token found to revoke.");
+                return false;
+            }
+
+            await _tokenRepository.UpdateLastEmailVerificationTokenAsync(companyId, string.Empty);
+            _logger.LogInformation("Verification token revoked successfully.");
+            return true;
+        }
+        catch (Exception ex)
         {
-            throw new InvalidOperationException("Företaget är redan verifierat.");
+            _logger.LogError(ex, "An error occurred while revoking verification token.");
+            throw;
         }
-
-        var token = await _accountVerificationTokenRepository.GetLastEmailVerificationTokenAsync(companyId);
-        if (string.IsNullOrEmpty(token))
-        {
-            _logger.LogWarning($"Ingen token hittades för Företags-ID: {companyId}");
-            return false;
-        }
-
-        await _accountVerificationTokenRepository.UpdateLastEmailVerificationTokenAsync(companyId, string.Empty);
-        _logger.LogInformation($"Verifieringstoken återkallad och raderad för Företags-ID: {companyId}");
-        return true;
     }
 
     public async Task<bool> IsVerificationTokenRevokedAsync(Guid companyId)
     {
-        var token = await _accountVerificationTokenRepository.GetLastEmailVerificationTokenAsync(companyId);
-        return string.IsNullOrEmpty(token);
+        try
+        {
+            var token = await _tokenRepository.GetLastEmailVerificationTokenAsync(companyId);
+            return string.IsNullOrEmpty(token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking if the verification token is revoked.");
+            throw;
+        }
     }
 
     public async Task<bool> IsVerificationTokenExpiredAsync(string token)
     {
-        var handler = new JwtSecurityTokenHandler();
-        if (!handler.CanReadToken(token))
+        try
         {
-            _logger.LogWarning("Ogiltig verifieringstoken.");
-            return true;
-        }
+            var handler = new JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(token))
+            {
+                _logger.LogWarning("Invalid verification token detected.");
+                return true;
+            }
 
-        var jwtToken = handler.ReadJwtToken(token);
-        if (DateTime.UtcNow > jwtToken.ValidTo)
+            var jwtToken = handler.ReadJwtToken(token);
+            if (DateTime.UtcNow > jwtToken.ValidTo)
+            {
+                _logger.LogWarning("Verification token has expired.");
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Verifieringstoken har gått ut: {token}");
-            return true;
+            _logger.LogError(ex, "An error occurred while checking token expiration.");
+            throw;
         }
-
-        return false;
     }
 
     private string GenerateNewToken(Guid companyId)
     {
-        // Implement your token generation logic here (JWT, GUID, etc.)
-        return Guid.NewGuid().ToString(); // Placeholder
+        try
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[] { new Claim("sub", companyId.ToString()) }),
+                Expires = DateTime.UtcNow.AddHours(1),
+                SigningCredentials = credentials,
+                Issuer = _configuration["Jwt:Issuer"]
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating verification token.");
+            throw;
+        }
     }
 }

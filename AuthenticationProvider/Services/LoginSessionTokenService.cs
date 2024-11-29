@@ -1,7 +1,9 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using Microsoft.Extensions.Logging;
-using AuthenticationProvider.Interfaces.Repositories;
+﻿using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Logging;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace AuthenticationProvider.Services;
 
@@ -10,7 +12,6 @@ public class LoginSessionTokenService : ILoginSessionTokenService
     private readonly ICompanyRepository _companyRepository;
     private readonly ILogger<LoginSessionTokenService> _logger;
 
-    // Updated constructor - removed the circular dependency
     public LoginSessionTokenService(ICompanyRepository companyRepository, ILogger<LoginSessionTokenService> logger)
     {
         _companyRepository = companyRepository;
@@ -19,84 +20,114 @@ public class LoginSessionTokenService : ILoginSessionTokenService
 
     public async Task<string> GenerateLoginSessionTokenAsync(string email)
     {
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null)
+        try
         {
-            throw new ArgumentException("Företag hittades inte."); // Swedish: Company not found
-        }
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null)
+            {
+                _logger.LogWarning("Company not found for email verification attempt.");
+                throw new ArgumentException("Företag hittades inte.");
+            }
 
-        // Check if the company is verified before generating the login session token
-        if (!company.IsVerified)
+            if (!company.IsVerified)
+            {
+                _logger.LogWarning("Email not verified for company verification attempt.");
+                throw new InvalidOperationException("E-posten är inte verifierad.");
+            }
+
+            var token = "generated-session-token"; // Replace with actual token generation logic
+
+            company.LastLoginSessionToken = token;
+            await _companyRepository.UpdateAsync(company);
+
+            _logger.LogInformation("Login session token generated successfully.");
+            return token;
+        }
+        catch (Exception ex)
         {
-            throw new InvalidOperationException("E-posten är inte verifierad. Kan inte generera inloggningssessionstoken."); // Swedish: Email is not verified. Cannot generate session token.
+            _logger.LogError(ex, "Error generating login session token.");
+            throw;
         }
-
-        // Implement the logic for generating a session token directly here
-        var token = "generated-session-token"; // Replace this with actual token generation logic
-
-        // Update the company with the new login session token
-        company.LastLoginSessionToken = token;
-        await _companyRepository.UpdateAsync(company);
-
-        _logger.LogInformation($"Inloggningssessionstoken genererad för företag: {company.CompanyName}, Email: {email}"); // Swedish: Login session token generated
-        return token;
     }
 
     public async Task<bool> InvalidateLoginSessionTokenAsync(string email)
     {
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null)
+        try
         {
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null)
+            {
+                _logger.LogWarning("Company not found for invalidating login session token.");
+                return false;
+            }
+
+            company.LastLoginSessionToken = string.Empty;
+            await _companyRepository.UpdateAsync(company);
+
+            _logger.LogInformation("Login session token invalidated successfully.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error invalidating login session token.");
             return false;
         }
-
-        company.LastLoginSessionToken = string.Empty;
-        await _companyRepository.UpdateAsync(company);
-
-        _logger.LogInformation($"Inloggningssessionstoken ogiltigförklarad för företag: {company.CompanyName}, Email: {email}"); // Swedish: Login session token invalidated
-        return true;
     }
 
     public async Task<bool> IsLoginSessionTokenExpiredAsync(string email)
     {
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null || string.IsNullOrEmpty(company.LastLoginSessionToken))
+        try
         {
-            return true; // No token found or company not found, so considered expired
-        }
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null || string.IsNullOrEmpty(company.LastLoginSessionToken))
+            {
+                return true;
+            }
 
-        var handler = new JwtSecurityTokenHandler();
-        if (!handler.CanReadToken(company.LastLoginSessionToken))
+            var handler = new JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(company.LastLoginSessionToken))
+            {
+                _logger.LogWarning("Invalid login session token detected.");
+                return true;
+            }
+
+            var jwtToken = handler.ReadJwtToken(company.LastLoginSessionToken);
+            if (DateTime.UtcNow > jwtToken.ValidTo)
+            {
+                _logger.LogWarning("Login session token has expired.");
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Ogiltig inloggningssessionstoken: {company.LastLoginSessionToken}"); // Swedish: Invalid login session token
-            return true; // Token is invalid
+            _logger.LogError(ex, "Error checking expiration for login session token.");
+            return true;
         }
-
-        var jwtToken = handler.ReadJwtToken(company.LastLoginSessionToken);
-        if (DateTime.UtcNow > jwtToken.ValidTo)
-        {
-            _logger.LogWarning($"Inloggningssessionstoken har gått ut: {company.LastLoginSessionToken}"); // Swedish: Login session token has expired
-            return true; // Token expired
-        }
-
-        return false; // Token is valid
     }
 
     public async Task<bool> RevokeLoginSessionTokenAsync(string email)
     {
-        // Step 1: Retrieve the company by email
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null || string.IsNullOrEmpty(company.LastLoginSessionToken))
+        try
         {
-            return false; // No token to revoke
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null || string.IsNullOrEmpty(company.LastLoginSessionToken))
+            {
+                _logger.LogWarning("No login session token to revoke for the company.");
+                return false;
+            }
+
+            company.LastLoginSessionToken = string.Empty;
+            await _companyRepository.UpdateAsync(company);
+
+            _logger.LogInformation("Login session token revoked successfully.");
+            return true;
         }
-
-        // Step 2: Revoke the login session token (clear it)
-        company.LastLoginSessionToken = string.Empty;
-        await _companyRepository.UpdateAsync(company);
-
-        // Log the successful revocation of the login session token
-        _logger.LogInformation($"Inloggningssessionstoken återkallad för företag: {company.CompanyName}, Email: {email}"); // Swedish: Login session token revoked
-        return true;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking login session token.");
+            return false;
+        }
     }
 }
