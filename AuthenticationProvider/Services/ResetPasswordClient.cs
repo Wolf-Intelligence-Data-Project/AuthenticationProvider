@@ -2,31 +2,24 @@
 using Newtonsoft.Json;
 using System.Text;
 
-namespace AuthenticationProvider.Services;
-
 public class ResetPasswordClient : IResetPasswordClient
 {
     private readonly HttpClient _httpClient;
+    private readonly string _endpoint;
 
-    public ResetPasswordClient(HttpClient httpClient)
+    public ResetPasswordClient(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
+        _endpoint = configuration["EmailVerificationProvider:Endpoint"]
+                    ?? throw new ArgumentNullException("Endpoint is not configured.");
     }
 
     public async Task<bool> SendResetPasswordEmailAsync(string token)
     {
-        // Create the request payload with only the Token (no email)
-        var requestPayload = new
-        {
-            Token = token
-        };
-
+        var requestPayload = new { Token = token };
         var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
 
-        // Send POST request to the EmailVerificationProvider endpoint
-        var response = await _httpClient.PostAsync("http://localhost:7092/api/SendVerificationEmail", content);
-
-        // Return true if the response is successful
+        var response = await _httpClient.PostAsync(_endpoint, content);
         return response.IsSuccessStatusCode;
     }
 }

@@ -29,10 +29,13 @@ builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
+// Register TokenRevocationService
+builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();  // This line is important
+
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/EmailVerification"); // Base URL for ResetPassword API
+    client.BaseAddress = new Uri("http://localhost:7092/api/ResetPassword"); // Base URL for ResetPassword API
 });
 
 // Register HttpClient for EmailVerificationClient (this is the missing part in your code)
@@ -40,6 +43,9 @@ builder.Services.AddHttpClient<EmailVerificationClient>(client =>
 {
     client.BaseAddress = new Uri("http://localhost:7092/api/EmailVerification"); // Base URL for EmailVerification API
 });
+
+// Register IMemoryCache
+builder.Services.AddMemoryCache();  // Register IMemoryCache
 
 // Add controllers
 builder.Services.AddControllers();

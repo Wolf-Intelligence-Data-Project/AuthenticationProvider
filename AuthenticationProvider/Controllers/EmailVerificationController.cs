@@ -1,73 +1,63 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Services;
+using AuthenticationProvider.Models.Tokens;
 using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-
-namespace AuthenticationProvider.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class EmailVerificationController : ControllerBase
 {
-    private readonly ICompanyRepository _companyRepository;
-    private readonly ITokenService _tokenService;
+    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly ILogger<EmailVerificationController> _logger;
 
-    public EmailVerificationController(ICompanyRepository companyRepository, ITokenService tokenService)
+    public EmailVerificationController(
+        IEmailVerificationService emailVerificationService,
+        ILogger<EmailVerificationController> logger)
     {
-        _companyRepository = companyRepository;
-        _tokenService = tokenService;
+        _emailVerificationService = emailVerificationService;
+        _logger = logger;
     }
-
-
 
     [HttpGet("verify-email")]
     public async Task<IActionResult> VerifyEmail(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
+            _logger.LogWarning("No token provided for email verification.");
             return BadRequest("Token krävs.");
         }
 
-        // Validate the token
-        var claimsPrincipal = _tokenService.ValidateToken(token);
-        if (claimsPrincipal == null)
+        try
         {
-            return BadRequest("Ogiltigt eller utgånget token."); 
+            // Call the service to verify the email
+            var result = await _emailVerificationService.VerifyEmailAsync(token);
+
+            switch (result)
+            {
+                case VerificationResult.InvalidToken:
+                    _logger.LogWarning("Invalid or expired token provided for email verification.");
+                    return BadRequest("Ogiltigt eller utgånget token.");
+                case VerificationResult.EmailNotFound:
+                    _logger.LogWarning("Email not found in the provided token: {Token}", token);
+                    return BadRequest("E-postadress hittades inte i token.");
+                case VerificationResult.CompanyNotFound:
+                    _logger.LogWarning("No company found with the provided email.");
+                    return BadRequest("Inget företag hittades med den angivna e-postadressen.");
+                case VerificationResult.AlreadyVerified:
+                    _logger.LogWarning("The company is already verified.");
+                    return BadRequest("E-posten är redan verifierad.");
+                case VerificationResult.Success:
+                    _logger.LogInformation("Email verified successfully.");
+                    return Ok("Din e-postadress har verifierats framgångsrikt.");  // Success message
+
+                default:
+                    _logger.LogError("Unknown verification result.");
+                    return StatusCode(500, "Ett okänt fel inträffade.");
+            }
         }
-
-        string email = ExtractEmailFromToken(token) ??
-                       ExtractEmailFromClaimsPrincipal(claimsPrincipal);
-
-        if (string.IsNullOrEmpty(email))
+        catch (Exception ex)
         {
-            return BadRequest("E-postadress hittades inte i token.");
+            _logger.LogError(ex, "An error occurred while verifying email for token: {Token}", token);
+            return StatusCode(500, "Ett fel inträffade vid verifiering av e-postadress.");
         }
-
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null)
-        {
-            return BadRequest("Inget företag hittades med den angivna e-postadressen."); 
-        }
-
-        company.IsVerified = true;
-        await _companyRepository.UpdateAsync(company);
-
-        return Ok("Din e-postadress har verifierats framgångsrikt.");
-    }
-
-    private string ExtractEmailFromToken(string token)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var decodedToken = tokenHandler.ReadJwtToken(token);
-        var emailClaim = decodedToken?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub);
-        return emailClaim?.Value;
-    }
-
-    private string ExtractEmailFromClaimsPrincipal(ClaimsPrincipal claimsPrincipal)
-    {
-        return claimsPrincipal?.Claims
-            .FirstOrDefault(c => c.Type.Equals("sub", StringComparison.OrdinalIgnoreCase))
-            ?.Value;
     }
 }
