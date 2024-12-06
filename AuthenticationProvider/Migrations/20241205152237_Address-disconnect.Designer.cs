@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AuthenticationProvider.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20241126200434_init")]
-    partial class init
+    [Migration("20241205152237_Address-disconnect")]
+    partial class Addressdisconnect
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,7 +25,7 @@ namespace AuthenticationProvider.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("AuthenticationProvider.Models.Address", b =>
+            modelBuilder.Entity("Address", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -47,9 +47,8 @@ namespace AuthenticationProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Region")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Region")
+                        .HasColumnType("int");
 
                     b.Property<string>("StreetAddress")
                         .IsRequired()
@@ -86,11 +85,15 @@ namespace AuthenticationProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PrimaryAddressId")
+                    b.Property<int?>("PrimaryAddressId")
                         .HasColumnType("int");
 
                     b.Property<string>("ResponsiblePersonName")
@@ -103,12 +106,13 @@ namespace AuthenticationProvider.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PrimaryAddressId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[PrimaryAddressId] IS NOT NULL");
 
                     b.ToTable("Companies");
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Models.Address", b =>
+            modelBuilder.Entity("Address", b =>
                 {
                     b.HasOne("AuthenticationProvider.Models.Company", "Company")
                         .WithMany("Addresses")
@@ -121,11 +125,10 @@ namespace AuthenticationProvider.Migrations
 
             modelBuilder.Entity("AuthenticationProvider.Models.Company", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Models.Address", "PrimaryAddress")
+                    b.HasOne("Address", "PrimaryAddress")
                         .WithOne()
                         .HasForeignKey("AuthenticationProvider.Models.Company", "PrimaryAddressId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("PrimaryAddress");
                 });

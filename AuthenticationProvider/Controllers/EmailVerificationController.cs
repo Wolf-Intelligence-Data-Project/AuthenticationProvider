@@ -8,10 +8,18 @@ namespace AuthenticationProvider.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EmailVerificationController(ICompanyRepository companyRepository, ITokenService tokenService) : ControllerBase
+public class EmailVerificationController : ControllerBase
 {
-    private readonly ICompanyRepository _companyRepository = companyRepository;
-    private readonly ITokenService _tokenService = tokenService;
+    private readonly ICompanyRepository _companyRepository;
+    private readonly ITokenService _tokenService;
+
+    public EmailVerificationController(ICompanyRepository companyRepository, ITokenService tokenService)
+    {
+        _companyRepository = companyRepository;
+        _tokenService = tokenService;
+    }
+
+
 
     [HttpGet("verify-email")]
     public async Task<IActionResult> VerifyEmail(string token)

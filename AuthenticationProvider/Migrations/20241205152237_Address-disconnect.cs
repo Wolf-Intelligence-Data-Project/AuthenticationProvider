@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace AuthenticationProvider.Migrations
 {
-    public partial class init : Migration
+    /// <inheritdoc />
+    public partial class Addressdisconnect : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -18,7 +20,7 @@ namespace AuthenticationProvider.Migrations
                     StreetAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PostalCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     City = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Region = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Region = table.Column<int>(type: "int", nullable: false),
                     CompanyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     AddressType = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
@@ -40,18 +42,18 @@ namespace AuthenticationProvider.Migrations
                     PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsVerified = table.Column<bool>(type: "bit", nullable: false),
                     TermsAndConditions = table.Column<bool>(type: "bit", nullable: false),
-                    PrimaryAddressId = table.Column<int>(type: "int", nullable: false)
+                    PrimaryAddressId = table.Column<int>(type: "int", nullable: true),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Companies", x => x.Id);
-                    // Foreign key with CASCADE delete behavior
                     table.ForeignKey(
                         name: "FK_Companies_Addresses_PrimaryAddressId",
                         column: x => x.PrimaryAddressId,
                         principalTable: "Addresses",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade); // Updated to Cascade delete
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateIndex(
@@ -63,7 +65,8 @@ namespace AuthenticationProvider.Migrations
                 name: "IX_Companies_PrimaryAddressId",
                 table: "Companies",
                 column: "PrimaryAddressId",
-                unique: true);
+                unique: true,
+                filter: "[PrimaryAddressId] IS NOT NULL");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Addresses_Companies_CompanyId",
@@ -71,9 +74,10 @@ namespace AuthenticationProvider.Migrations
                 column: "CompanyId",
                 principalTable: "Companies",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.Restrict); // No change here, Restrict for the secondary addresses
+                onDelete: ReferentialAction.Restrict);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(

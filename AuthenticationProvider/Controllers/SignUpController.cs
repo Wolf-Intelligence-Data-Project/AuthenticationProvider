@@ -1,6 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models.SignUp;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Controllers;
@@ -26,12 +27,18 @@ public class SignUpController : ControllerBase
 
         try
         {
-            var response = await _signUpService.RegisterCompanyAsync(request);
-            return Ok(response); // Successfully registered
+            // Delegate registration logic to the SignUpService
+            var signUpResponse = await _signUpService.RegisterCompanyAsync(request);
+
+            return Ok(new
+            {
+                message = "Company registered successfully!",
+                token = signUpResponse.Token
+            });
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });  // Handle other exceptions
+            return BadRequest(new { message = ex.Message });  // Handle exceptions
         }
     }
 }

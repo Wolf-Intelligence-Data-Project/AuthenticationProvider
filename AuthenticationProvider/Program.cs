@@ -21,14 +21,24 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<ISignUpService, SignUpService>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>(); // Your implementation of ICompanyRepository
 builder.Services.AddScoped<IAddressRepository, AddressRepository>();
-builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>(); // Placeholder implementation, will connect to EmailVerificationProvider service later
+builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>(); // EmailVerificationService that uses EmailVerificationClient
+builder.Services.AddScoped<IResetPasswordTokenService, ResetPasswordTokenService>(); // Added ResetPasswordTokenService
+builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>(); // Add ResetPasswordTokenRepository
+builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
+builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
-// Register HttpClient for the EmailVerificationClient
+// Register HttpClient for ResetPasswordClient
+builder.Services.AddHttpClient<ResetPasswordClient>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:7092/api/EmailVerification"); // Base URL for ResetPassword API
+});
+
+// Register HttpClient for EmailVerificationClient (this is the missing part in your code)
 builder.Services.AddHttpClient<EmailVerificationClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/SendVerificationEmail"); // Change if necessary
+    client.BaseAddress = new Uri("http://localhost:7092/api/EmailVerification"); // Base URL for EmailVerification API
 });
 
 // Add controllers

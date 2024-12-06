@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AuthenticationProvider.Models;
 
@@ -32,15 +32,13 @@ public class Company
     [Required]
     public bool TermsAndConditions { get; set; }
 
-    [Required]
-    public int PrimaryAddressId { get; set; }
+    public int? PrimaryAddressId { get; set; } // Optional
 
     [ForeignKey("PrimaryAddressId")]
-    public Address PrimaryAddress { get; set; } = new Address();
+    public Address? PrimaryAddress { get; set; } // Optional
 
     public ICollection<Address> Addresses { get; set; } = new List<Address>();
 
-    // This is where you store the hashed password
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
 }

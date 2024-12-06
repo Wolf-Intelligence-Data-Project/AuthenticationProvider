@@ -5,7 +5,7 @@
 namespace AuthenticationProvider.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateForeignKeyOnDeleteCascade : Migration
+    public partial class Addressdisconnectfix3 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AuthenticationProvider.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20241126202330_PasswordHashAdded")]
-    partial class PasswordHashAdded
+    [Migration("20241205153241_Address-disconnect-fix-3")]
+    partial class Addressdisconnectfix3
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,22 +37,18 @@ namespace AuthenticationProvider.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("City")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("CompanyId")
+                    b.Property<Guid?>("CompanyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("PostalCode")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Region")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int?>("Region")
+                        .HasColumnType("int");
 
                     b.Property<string>("StreetAddress")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -94,7 +90,7 @@ namespace AuthenticationProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PrimaryAddressId")
+                    b.Property<int?>("PrimaryAddressId")
                         .HasColumnType("int");
 
                     b.Property<string>("ResponsiblePersonName")
@@ -107,7 +103,8 @@ namespace AuthenticationProvider.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PrimaryAddressId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[PrimaryAddressId] IS NOT NULL");
 
                     b.ToTable("Companies");
                 });
@@ -117,8 +114,7 @@ namespace AuthenticationProvider.Migrations
                     b.HasOne("AuthenticationProvider.Models.Company", "Company")
                         .WithMany("Addresses")
                         .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Company");
                 });
@@ -128,8 +124,7 @@ namespace AuthenticationProvider.Migrations
                     b.HasOne("AuthenticationProvider.Models.Address", "PrimaryAddress")
                         .WithOne()
                         .HasForeignKey("AuthenticationProvider.Models.Company", "PrimaryAddressId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("PrimaryAddress");
                 });
