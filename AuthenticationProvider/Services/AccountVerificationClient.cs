@@ -4,7 +4,7 @@ using System.Net.Http;
 
 namespace AuthenticationProvider.Services;
 
-public class EmailVerificationClient(HttpClient httpClient)
+public class AccountVerificationClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Interfaces;
 
-public interface IEmailVerificationService
+public interface IAccountVerificationService
 {
     // Sends the verification email with the provided token
     Task<bool> SendVerificationEmailAsync(string token);

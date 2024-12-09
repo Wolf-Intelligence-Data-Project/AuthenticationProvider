@@ -1,8 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models.SignIn;
+using AuthenticationProvider.Services;
 using Microsoft.AspNetCore.Mvc;
-
-namespace AuthenticationProvider.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -10,11 +9,13 @@ public class AuthController : ControllerBase
 {
     private readonly ISignInService _signInService;
     private readonly ISignOutService _signOutService;
+    private readonly IAccessTokenService _accessTokenService;
 
-    public AuthController(ISignInService signInService, ISignOutService signOutService)
+    public AuthController(ISignInService signInService, ISignOutService signOutService, IAccessTokenService accessTokenService)
     {
         _signInService = signInService;
         _signOutService = signOutService;
+        _accessTokenService = accessTokenService;
     }
 
     [HttpPost("login")]
@@ -28,6 +29,7 @@ public class AuthController : ControllerBase
         var response = await _signInService.SignInAsync(request);
         if (response.Success)
         {
+            // Return the token generated in the SignInService
             return Ok(new { Token = response.Token });
         }
 
@@ -39,15 +41,19 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrEmpty(token))
         {
-            return BadRequest("Token krävs för utloggning."); // Translation for missing token message
+            return BadRequest("Token krävs för utloggning.");
         }
+
+        // Revoke the access token using AccessTokenService
+        _accessTokenService.RevokeAccessToken(token);
 
         var result = await _signOutService.SignOutAsync(token);
         if (result)
         {
-            return Ok("Utloggning lyckades."); // Translation for successful logout
+            return Ok("Utloggning lyckades.");
         }
 
-        return BadRequest("Misslyckades med att logga ut. Token kan redan vara ogiltig eller saknas."); // Translation for logout failure
+        return BadRequest("Misslyckades med att logga ut. Token kan redan vara ogiltig eller saknas.");
     }
+
 }

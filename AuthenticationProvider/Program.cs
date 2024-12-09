@@ -5,7 +5,8 @@ using AuthenticationProvider.Repositories;
 using AuthenticationProvider.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Net.Http;
+using Microsoft.AspNetCore.Identity;  // Add this namespace
+using AuthenticationProvider.Models;  // Make sure this namespace contains your ApplicationUser class
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,35 +18,63 @@ builder.Logging.AddDebug();    // Log to the debug output window
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register services
+// Register ASP.NET Core Identity services
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();  // Registering Identity services
+
+// Register your application services
+builder.Services.AddScoped<IAccountVerificationTokenRepository, AccountVerificationTokenRepository>();
+builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerificationTokenService>();
+builder.Services.AddScoped<IAccountVerificationService, AccountVerificationService>();
+
+builder.Services.AddScoped<IAccessTokenService, AccessTokenService>();
+
+builder.Services.AddScoped<ISignInService, SignInService>();
 builder.Services.AddScoped<ISignUpService, SignUpService>();
-builder.Services.AddScoped<ICompanyRepository, CompanyRepository>(); // Your implementation of ICompanyRepository
+builder.Services.AddScoped<ISignOutService, SignOutService>();
+
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IAddressRepository, AddressRepository>();
-builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>(); // EmailVerificationService that uses EmailVerificationClient
-builder.Services.AddScoped<IResetPasswordTokenService, ResetPasswordTokenService>(); // Added ResetPasswordTokenService
-builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>(); // Add ResetPasswordTokenRepository
+
+
+builder.Services.AddScoped<IResetPasswordTokenService, ResetPasswordTokenService>();
+builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>();
 builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
 builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
+
+
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-builder.Services.AddSingleton<ITokenService, TokenService>();
+
 
 // Register TokenRevocationService
-builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();  // This line is important
+builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/ResetPassword"); // Base URL for ResetPassword API
+    client.BaseAddress = new Uri("http://localhost:7092/api/ResetPassword");
 });
 
-// Register HttpClient for EmailVerificationClient (this is the missing part in your code)
-builder.Services.AddHttpClient<EmailVerificationClient>(client =>
+// Register HttpClient for EmailVerificationClient
+builder.Services.AddHttpClient<AccountVerificationClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/EmailVerification"); // Base URL for EmailVerification API
+    client.BaseAddress = new Uri("http://localhost:7092/api/AccountVerification");
 });
 
 // Register IMemoryCache
-builder.Services.AddMemoryCache();  // Register IMemoryCache
+builder.Services.AddMemoryCache();
+
+// Register CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 // Add controllers
 builder.Services.AddControllers();
@@ -62,6 +91,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Use CORS
+app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

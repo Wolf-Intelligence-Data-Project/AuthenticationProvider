@@ -2,13 +2,13 @@
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Repositories
+namespace AuthenticationProvider.Repositories;
+
+public interface IResetPasswordTokenRepository
 {
-    public interface IResetPasswordTokenRepository
-    {
-        Task<ResetPasswordToken> GetByTokenAsync(string token);
-        Task<ResetPasswordToken> CreateAsync(ResetPasswordToken token);
-        Task DeleteAsync(Guid companyId);
-        Task MarkAsUsedAsync(Guid tokenId);
-    }
+    Task<ResetPasswordToken> GetByIdAsync(Guid id);
+    Task<ResetPasswordToken> GetByTokenAsync(string token);
+    Task<ResetPasswordToken> CreateAsync(ResetPasswordToken token);
+    Task DeleteAsync(Guid companyId);
+    Task MarkAsUsedAsync(Guid tokenId);
 }

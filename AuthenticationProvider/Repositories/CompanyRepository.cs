@@ -111,4 +111,23 @@ public class CompanyRepository : ICompanyRepository
             throw;  // Re-throw the exception to handle it elsewhere
         }
     }
+    // Add this method to the CompanyRepository
+    public async Task<Company> GetByIdAsync(Guid companyId)
+    {
+        try
+        {
+            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId);
+        }
+        catch (Exception ex)
+        {
+            // Log the exception
+            Console.WriteLine($"Error retrieving company by ID: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+            }
+            throw;  // Re-throw the exception to handle it elsewhere
+        }
+    }
+
 }

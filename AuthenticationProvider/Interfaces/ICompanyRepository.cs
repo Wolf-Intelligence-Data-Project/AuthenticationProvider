@@ -33,4 +33,6 @@ public interface ICompanyRepository
     /// <param name="email">The email address to search for.</param>
     /// <returns>The company if found, otherwise null.</returns>
     Task<Company> GetByEmailAsync(string email);
+
+    Task<Company> GetByIdAsync(Guid companyId);
 }

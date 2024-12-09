@@ -15,7 +15,11 @@ namespace AuthenticationProvider.Repositories
         {
             _context = context;
         }
-
+        public async Task<ResetPasswordToken> GetByIdAsync(Guid id)
+        {
+            return await _context.ResetPasswordTokens
+                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > DateTime.UtcNow && !t.IsUsed);
+        }
         public async Task<ResetPasswordToken> GetByTokenAsync(string token)
         {
             return await _context.ResetPasswordTokens

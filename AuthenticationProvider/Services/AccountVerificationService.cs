@@ -7,60 +7,62 @@ using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Services
 {
-    public class EmailVerificationService : IEmailVerificationService
+    public class AccountVerificationService : IAccountVerificationService
     {
-        private readonly EmailVerificationClient _emailVerificationClient;
-        private readonly ITokenService _tokenService;
+        private readonly AccountVerificationClient _accountVerificationClient;
+        private readonly IAccountVerificationTokenService _accountVerificationTokenService;
         private readonly ITokenRevocationService _tokenRevocationService;
         private readonly ICompanyRepository _companyRepository;
-        private readonly ILogger<EmailVerificationService> _logger;
+        private readonly ILogger<AccountVerificationService> _logger;
 
-        public EmailVerificationService(
-            EmailVerificationClient emailVerificationClient,
-            ITokenService tokenService,
+        public AccountVerificationService(
+            AccountVerificationClient accountVerificationClient,
+            IAccountVerificationTokenService accountVerificationTokenService,
             ITokenRevocationService tokenRevocationService,
             ICompanyRepository companyRepository,
-            ILogger<EmailVerificationService> logger)
+            ILogger<AccountVerificationService> logger)
         {
-            _emailVerificationClient = emailVerificationClient;
-            _tokenService = tokenService;
+            _accountVerificationClient = accountVerificationClient;
+            _accountVerificationTokenService = accountVerificationTokenService;
             _tokenRevocationService = tokenRevocationService;
             _companyRepository = companyRepository;
             _logger = logger;
         }
 
-        // Sends the verification email
         public async Task<bool> SendVerificationEmailAsync(string token)
         {
             try
             {
-                return await _emailVerificationClient.SendVerificationEmailAsync(token);
+                var result = await _accountVerificationClient.SendVerificationEmailAsync(token);
+                if (!result)
+                {
+                    _logger.LogError("Failed to send email for token: {Token}", token);
+                    return false;
+                }
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending verification email.");
+                _logger.LogError(ex, "Error sending verification email for token: {Token}", token);
                 return false;
             }
         }
 
-        // Verifies the email and updates the company status
         public async Task<VerificationResult> VerifyEmailAsync(string token)
         {
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogWarning("No token provided for email verification.");
+                _logger.LogWarning("No token provided for account verification.");
                 return VerificationResult.InvalidToken;
             }
 
-            // Validate the token
-            var claimsPrincipal = _tokenService.ValidateToken(token);
+            var claimsPrincipal = _accountVerificationTokenService.ValidateTokenAsync(token);
             if (claimsPrincipal == null)
             {
                 _logger.LogWarning("Invalid token: {Token}", token);
                 return VerificationResult.InvalidToken;
             }
 
-            // Extract the email from the token
             var email = ExtractEmailFromToken(token);
             if (string.IsNullOrEmpty(email))
             {
@@ -68,7 +70,6 @@ namespace AuthenticationProvider.Services
                 return VerificationResult.EmailNotFound;
             }
 
-            // Fetch company by email
             var company = await _companyRepository.GetByEmailAsync(email);
             if (company == null)
             {
@@ -76,25 +77,21 @@ namespace AuthenticationProvider.Services
                 return VerificationResult.CompanyNotFound;
             }
 
-            // If the company is already verified, no need to update
             if (company.IsVerified)
             {
                 _logger.LogInformation("The company is already verified.");
                 return VerificationResult.AlreadyVerified;
             }
 
-            // Mark the company as verified
             company.IsVerified = true;
             await _companyRepository.UpdateAsync(company);
 
-            // Revoke the token once it is used
             await _tokenRevocationService.RevokeTokenAsync(token);
 
-            _logger.LogInformation("Email verified successfully for company: {CompanyId}", company.Id);
+            _logger.LogInformation("Account verified successfully for company: {CompanyId}", company.Id);
             return VerificationResult.Success;
         }
 
-        // Extract the email from the token
         private string ExtractEmailFromToken(string token)
         {
             try
@@ -111,5 +108,4 @@ namespace AuthenticationProvider.Services
             }
         }
     }
-
 }

@@ -14,34 +14,25 @@ public class TokenService : ITokenService
         _configuration = configuration;
     }
 
-    // Generate a token (used for both login session and email verification)
+    // Generate a token for email verification
     public string GenerateToken(string email, string tokenType)
     {
+        if (tokenType != "EmailVerification")
+        {
+            throw new ArgumentException("Invalid token type. Only 'EmailVerification' is supported.");
+        }
+
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, email),  // Storing email as 'sub' claim
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique ID for the token
-            new Claim("TokenType", tokenType)  // Custom claim to differentiate token types
+            new Claim("TokenType", tokenType)  // Custom claim to indicate token type
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        DateTime expirationTime;
-
-        // Set different expiration times based on the token type
-        if (tokenType == "EmailVerification")
-        {
-            expirationTime = DateTime.Now.AddDays(7);  // Email verification token expires in 7 days
-        }
-        else if (tokenType == "LoginSession")
-        {
-            expirationTime = DateTime.Now.AddHours(1);  // Login session token expires in 1 hour
-        }
-        else
-        {
-            expirationTime = DateTime.Now.AddHours(1);  // Default expiration time (for unknown token types)
-        }
+        var expirationTime = DateTime.Now.AddDays(7);  // Email verification token expires in 7 days
 
         var token = new JwtSecurityToken(
             _configuration["Jwt:Issuer"],
@@ -74,6 +65,14 @@ public class TokenService : ITokenService
         try
         {
             var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
+
+            // Ensure the token is of type EmailVerification
+            var tokenTypeClaim = principal.Claims.FirstOrDefault(c => c.Type == "TokenType")?.Value;
+            if (tokenTypeClaim != "EmailVerification")
+            {
+                throw new SecurityTokenException("Invalid token type.");
+            }
+
             return principal;
         }
         catch

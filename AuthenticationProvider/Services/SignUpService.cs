@@ -5,6 +5,7 @@ using AuthenticationProvider.Models.Tokens;
 using Microsoft.AspNetCore.Identity;
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.Design;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -13,20 +14,20 @@ namespace AuthenticationProvider.Services
     public class SignUpService : ISignUpService
     {
         private readonly ICompanyRepository _companyRepository;
-        private readonly ITokenService _tokenService;
-        private readonly IEmailVerificationService _emailVerificationService;
+        private readonly IAccountVerificationTokenService _accountVerificationTokenService;
+        private readonly IAccountVerificationService _accountVerificationService;
         private readonly ILogger<SignUpService> _logger;
         private readonly PasswordHasher<Company> _passwordHasher;
 
         public SignUpService(
             ICompanyRepository companyRepository,
-            ITokenService tokenService,
-            IEmailVerificationService emailVerificationService,
+            IAccountVerificationTokenService accountVerificationTokenService,
+            IAccountVerificationService accountVerificationService,
             ILogger<SignUpService> logger)
         {
             _companyRepository = companyRepository;
-            _tokenService = tokenService;
-            _emailVerificationService = emailVerificationService;
+            _accountVerificationTokenService = accountVerificationTokenService;
+            _accountVerificationService = accountVerificationService;
             _logger = logger;
             _passwordHasher = new PasswordHasher<Company>();  // Initialize PasswordHasher
         }
@@ -109,10 +110,10 @@ namespace AuthenticationProvider.Services
             await _companyRepository.AddAsync(company);
 
             // Generate email verification token
-            var token = _tokenService.GenerateToken(company.Email, TokenType.EmailVerification.ToString());
+            var token = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
 
             // Send the verification email using the EmailVerificationService
-            bool emailSent = await _emailVerificationService.SendVerificationEmailAsync(token);
+            bool emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
 
             if (!emailSent)
             {

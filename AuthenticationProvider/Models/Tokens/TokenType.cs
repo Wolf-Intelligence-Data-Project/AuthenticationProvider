@@ -2,6 +2,7 @@
 
 public enum TokenType
 {
-    EmailVerification,
-    LoginSession
+    AccountVerification,
+    ResetPassword,
+    AccessToken
 }

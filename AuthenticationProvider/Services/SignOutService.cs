@@ -13,6 +13,7 @@ public class SignOutService : ISignOutService
     {
         _cache = cache;
     }
+
     public async Task<bool> SignOutAsync(string token)
     {
         if (string.IsNullOrEmpty(token))
@@ -22,6 +23,12 @@ public class SignOutService : ISignOutService
 
         try
         {
+            // Check if the token is already blacklisted
+            if (_cache.TryGetValue(token, out bool isBlacklisted) && isBlacklisted)
+            {
+                return true; // Token is already blacklisted, sign-out is already done
+            }
+
             // Add the token to a blacklist cache with an expiration equal to its remaining validity period
             var expiration = GetTokenExpiration(token);
             if (expiration.HasValue)
@@ -34,13 +41,14 @@ public class SignOutService : ISignOutService
                 _cache.Set(token, true, TimeSpan.FromHours(1));
             }
 
-            return await Task.FromResult(true); // Successfully blacklisted
+            return true; // Successfully blacklisted
         }
         catch
         {
-            return false; // An error occurred
+            return false; // An error occurred while signing out
         }
     }
+
     private DateTime? GetTokenExpiration(string token)
     {
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();

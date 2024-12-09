@@ -6,11 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/[controller]")]
 public class EmailVerificationController : ControllerBase
 {
-    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly IAccountVerificationService _emailVerificationService;
     private readonly ILogger<EmailVerificationController> _logger;
 
     public EmailVerificationController(
-        IEmailVerificationService emailVerificationService,
+        IAccountVerificationService emailVerificationService,
         ILogger<EmailVerificationController> logger)
     {
         _emailVerificationService = emailVerificationService;
