@@ -71,7 +71,7 @@ namespace AuthenticationProvider.Services
                 {
             new Claim(ClaimTypes.NameIdentifier, companyId.ToString()),  // companyId as NameIdentifier claim
             new Claim(ClaimTypes.Email, company.Email),                 // Email as Email claim
-            new Claim("token_type", "AccountVerification")             // Custom claim for token type
+            new Claim("token_type", "ResetPassword")             // Custom claim for token type
             }),
                 Expires = DateTime.UtcNow.AddHours(1),
                 Issuer = issuer,
