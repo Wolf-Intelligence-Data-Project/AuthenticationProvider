@@ -56,7 +56,7 @@ namespace AuthenticationProvider.Services
                 return VerificationResult.InvalidToken;
             }
 
-            var claimsPrincipal = _accountVerificationTokenService.ValidateTokenAsync(token);
+            var claimsPrincipal = _accountVerificationTokenService.ValidateAccountVerificationTokenAsync(token);
             if (claimsPrincipal == null)
             {
                 _logger.LogWarning("Invalid token: {Token}", token);

@@ -10,6 +10,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
     }
 
+    // DbSets for your entities
     public DbSet<Company> Companies { get; set; }
     public DbSet<Address> Addresses { get; set; }
     public DbSet<ResetPasswordToken> ResetPasswordTokens { get; set; }
@@ -19,7 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure Company entity
+        // Configure the Company entity relationships
         modelBuilder.Entity<Company>()
             .HasMany(c => c.Addresses)
             .WithOne(a => a.Company)
@@ -32,7 +33,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey<Company>(c => c.PrimaryAddressId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Configure ResetPasswordToken entity
+        // Configure the ResetPasswordToken entity
         modelBuilder.Entity<ResetPasswordToken>(entity =>
         {
             entity.ToTable("ResetPasswordTokens");
@@ -41,14 +42,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(t => t.Company)
                 .WithMany()
                 .HasForeignKey(t => t.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade); // Delete tokens when a company is deleted
 
             entity.Property(t => t.Token).IsRequired();
             entity.Property(t => t.ExpiryDate).IsRequired();
             entity.Property(t => t.IsUsed).HasDefaultValue(false);
         });
 
-        // Configure AccountVerificationToken entity
+        // Configure the AccountVerificationToken entity
         modelBuilder.Entity<AccountVerificationToken>(entity =>
         {
             entity.ToTable("AccountVerificationTokens"); // Explicit table name

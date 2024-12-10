@@ -129,5 +129,31 @@ public class CompanyRepository : ICompanyRepository
             throw;  // Re-throw the exception to handle it elsewhere
         }
     }
+    // Delete a company by its ID
+    public async Task DeleteAsync(Guid companyId)
+    {
+        try
+        {
+            var company = await _context.Companies
+                .Include(c => c.Addresses)  // Ensure related addresses are loaded
+                .FirstOrDefaultAsync(c => c.Id == companyId);
+
+            if (company == null)
+            {
+                throw new InvalidOperationException("Företaget finns inte.");
+            }
+
+            // Remove all associated addresses
+            _context.Addresses.RemoveRange(company.Addresses);
+
+            // Remove the company
+            _context.Companies.Remove(company);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Could not delete.");
+        }
+    }
 
 }

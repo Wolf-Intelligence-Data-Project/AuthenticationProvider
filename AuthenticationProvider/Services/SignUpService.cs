@@ -1,13 +1,12 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
 using AuthenticationProvider.Models.SignUp;
-using AuthenticationProvider.Models.Tokens;
-using Microsoft.AspNetCore.Identity;
+using AuthenticationProvider.Models;
+using Microsoft.Extensions.Logging;
 using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.Design;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 
 namespace AuthenticationProvider.Services
 {
@@ -16,6 +15,7 @@ namespace AuthenticationProvider.Services
         private readonly ICompanyRepository _companyRepository;
         private readonly IAccountVerificationTokenService _accountVerificationTokenService;
         private readonly IAccountVerificationService _accountVerificationService;
+        private readonly IAddressRepository _addressRepository;
         private readonly ILogger<SignUpService> _logger;
         private readonly PasswordHasher<Company> _passwordHasher;
 
@@ -23,74 +23,30 @@ namespace AuthenticationProvider.Services
             ICompanyRepository companyRepository,
             IAccountVerificationTokenService accountVerificationTokenService,
             IAccountVerificationService accountVerificationService,
+            IAddressRepository addressRepository,
             ILogger<SignUpService> logger)
         {
             _companyRepository = companyRepository;
             _accountVerificationTokenService = accountVerificationTokenService;
             _accountVerificationService = accountVerificationService;
+            _addressRepository = addressRepository;
             _logger = logger;
-            _passwordHasher = new PasswordHasher<Company>();  // Initialize PasswordHasher
+            _passwordHasher = new PasswordHasher<Company>();
         }
 
         public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
         {
-            // Validate Organisation Number (10 digits)
-            if (!Regex.IsMatch(request.OrganisationNumber, @"^\d{10}$"))
-            {
-                throw new InvalidOperationException("Organisation number must contain exactly 10 digits.");
-            }
+            // Validation Logic
+            ValidateSignUpRequest(request);
 
-            // Validate Email format
-            if (!new EmailAddressAttribute().IsValid(request.Email))
-            {
-                throw new InvalidOperationException("Invalid email format.");
-            }
-
-            // Check for email and organisation number uniqueness
+            // Check if company already exists
             if (await _companyRepository.CompanyExistsAsync(request.OrganisationNumber, request.Email))
             {
-                throw new InvalidOperationException("Company with the provided Organisation Number or Email already exists.");
+                throw new InvalidOperationException("Ett företag med angivet organisationsnummer eller e-post finns redan.");
             }
 
-            // Validate Business Type (Enum check)
-            if (!Enum.IsDefined(typeof(BusinessType), request.BusinessType))
-            {
-                throw new InvalidOperationException("Invalid Business Type.");
-            }
-
-            // Validate Responsible Person's Name (length check)
-            if (request.ResponsiblePersonName.Length > 100)
-            {
-                throw new InvalidOperationException("Responsible person's name should not exceed 100 characters.");
-            }
-
-            // Validate Phone Number (Swedish format)
-            if (!Regex.IsMatch(request.PhoneNumber, @"^\+46\d{9}$"))
-            {
-                throw new InvalidOperationException("Phone number must be a valid Swedish number starting with +46.");
-            }
-
-            // Check Terms and Conditions acceptance
-            if (!request.TermsAndConditions)
-            {
-                throw new InvalidOperationException("You must accept the Terms and Conditions.");
-            }
-
-            // Validate Password strength (minimum requirements)
-            var passwordRegex = new Regex(@"^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+={}\[\]:;'<>?\/.,]).{8,}$");
-            if (!passwordRegex.IsMatch(request.Password))
-            {
-                throw new InvalidOperationException("Password must contain at least one letter, one number, and one special character.");
-            }
-
-            // Validate Password Confirmation
-            if (request.Password != request.ConfirmPassword)
-            {
-                throw new InvalidOperationException("Passwords do not match.");
-            }
-
-            // Hash the password before saving
-            string hashedPassword = _passwordHasher.HashPassword(null, request.Password);  // Use null for the object parameter
+            // Hash the password
+            string hashedPassword = _passwordHasher.HashPassword(null, request.Password);
 
             // Create new company object
             var company = new Company
@@ -98,35 +54,135 @@ namespace AuthenticationProvider.Services
                 OrganisationNumber = request.OrganisationNumber,
                 CompanyName = request.CompanyName,
                 Email = request.Email,
-                BusinessType = request.BusinessType,  // Enum value directly
+                BusinessType = request.BusinessType,
                 ResponsiblePersonName = request.ResponsiblePersonName,
                 PhoneNumber = request.PhoneNumber,
                 TermsAndConditions = request.TermsAndConditions,
-                IsVerified = false, // Initially false, as verification happens via email
-                PasswordHash = hashedPassword // Store the hashed password
+                IsVerified = false,
+                PasswordHash = hashedPassword
             };
 
-            // Add company to the repository (database)
+            // Add the company to the database
             await _companyRepository.AddAsync(company);
 
-            // Generate email verification token
+            // Add the primary and additional addresses
+            await AddAddressesAsync(request, company);
+
+            // Generate an account verification token
             var token = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
 
-            // Send the verification email using the EmailVerificationService
-            bool emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
-
+            // Send the verification email
+            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
             if (!emailSent)
             {
-                throw new InvalidOperationException("Failed to send verification email.");
+                throw new InvalidOperationException("Det gick inte att skicka verifieringsmail.");
             }
 
-            // Return the response with success and token
             return new SignUpResponse
             {
                 Success = true,
                 CompanyId = company.Id,
                 Token = token
             };
+        }
+
+        public async Task DeleteCompanyAsync(Guid companyId)
+        {
+            var company = await _companyRepository.GetByIdAsync(companyId);
+            if (company == null)
+            {
+                throw new InvalidOperationException("Företaget hittades inte.");
+            }
+
+            // Delete the company
+            await _companyRepository.DeleteAsync(companyId);
+            _logger.LogInformation($"Företaget med ID {companyId} har raderats.");
+        }
+
+        private async Task AddAddressesAsync(SignUpRequest request, Company company)
+        {
+            // Add primary address
+            var primaryAddress = new Address
+            {
+                StreetAddress = request.PrimaryAddress.StreetAddress,
+                City = request.PrimaryAddress.City,
+                PostalCode = request.PrimaryAddress.PostalCode,
+                CompanyId = company.Id,
+                AddressType = "Primary",
+                Region = request.PrimaryAddress.Region,
+                IsPrimary = true
+            };
+
+            await _addressRepository.AddAsync(primaryAddress);
+
+            // Add additional addresses
+            foreach (var additionalAddress in request.AdditionalAddresses)
+            {
+                var address = new Address
+                {
+                    StreetAddress = additionalAddress.StreetAddress,
+                    City = additionalAddress.City,
+                    PostalCode = additionalAddress.PostalCode,
+                    CompanyId = company.Id,
+                    AddressType = "Additional",
+                    Region = additionalAddress.Region,
+                    IsPrimary = false
+                };
+
+                await _addressRepository.AddAsync(address);
+            }
+        }
+
+        private void ValidateSignUpRequest(SignUpRequest request)
+        {
+            // Organisation Number (10 digits)
+            if (!Regex.IsMatch(request.OrganisationNumber, @"^\d{10}$"))
+            {
+                throw new InvalidOperationException("Organisationsnumret måste innehålla exakt 10 siffror.");
+            }
+
+            // Email format
+            if (!new EmailAddressAttribute().IsValid(request.Email))
+            {
+                throw new InvalidOperationException("Ogiltigt e-postformat.");
+            }
+
+            // Password strength
+            var passwordRegex = new Regex(@"^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+={}\[\]:;'<>?\/.,]).{8,}$");
+            if (!passwordRegex.IsMatch(request.Password))
+            {
+                throw new InvalidOperationException("Lösenordet måste innehålla minst en bokstav, en siffra och ett specialtecken.");
+            }
+
+            // Password confirmation
+            if (request.Password != request.ConfirmPassword)
+            {
+                throw new InvalidOperationException("Lösenorden matchar inte.");
+            }
+
+            // Business Type validation
+            if (!Enum.IsDefined(typeof(BusinessType), request.BusinessType))
+            {
+                throw new InvalidOperationException("Ogiltig företagstyp.");
+            }
+
+            // Responsible person's name
+            if (request.ResponsiblePersonName.Length > 100)
+            {
+                throw new InvalidOperationException("Ansvarig persons namn får inte överstiga 100 tecken.");
+            }
+
+            // Phone Number (Swedish format)
+            if (!Regex.IsMatch(request.PhoneNumber, @"^\+46\d{9}$"))
+            {
+                throw new InvalidOperationException("Telefonnumret måste vara ett giltigt svenskt nummer som börjar med +46.");
+            }
+
+            // Terms and Conditions
+            if (!request.TermsAndConditions)
+            {
+                throw new InvalidOperationException("Du måste acceptera villkoren.");
+            }
         }
     }
 }

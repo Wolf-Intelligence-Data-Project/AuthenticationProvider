@@ -18,18 +18,19 @@ public class AddressRepository : IAddressRepository
     // Add a new address to the database
     public async Task AddAsync(Address address)
     {
-        // Ensure address uniqueness: Same street address, postal code, and city should not exist.
+        // Ensure address uniqueness: Same street address, postal code, and city should not exist for the same company
         bool isAddressUnique = !await _dbContext.Addresses
             .AnyAsync(a => a.StreetAddress == address.StreetAddress
                            && a.PostalCode == address.PostalCode
-                           && a.City == address.City);
+                           && a.City == address.City
+                           && a.CompanyId == address.CompanyId); // Ensure uniqueness per company
 
         if (!isAddressUnique)
         {
             throw new InvalidOperationException("Adressen existerar redan i systemet.");  // "The address already exists in the system."
         }
 
-        // If adding primary address, check if company already has a primary address
+        // If adding a primary address, check if the company already has a primary address
         if (address.AddressType == "Primary")
         {
             bool hasPrimaryAddress = await _dbContext.Addresses

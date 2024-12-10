@@ -1,17 +1,21 @@
 ﻿using AuthenticationProvider.Data;
 using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Models;
-using Microsoft.EntityFrameworkCore; // Added this directive
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;  // Make sure to include this namespace for logging
 
 namespace AuthenticationProvider.Repositories
 {
     public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<AccountVerificationTokenRepository> _logger;
 
-        public AccountVerificationTokenRepository(ApplicationDbContext context)
+        // Inject ILogger in the constructor
+        public AccountVerificationTokenRepository(ApplicationDbContext context, ILogger<AccountVerificationTokenRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<AccountVerificationToken> CreateAsync(AccountVerificationToken token)
@@ -37,17 +41,35 @@ namespace AuthenticationProvider.Repositories
             }
         }
 
-        // New DeleteAsync method
-        public async Task DeleteAsync(Guid companyId)
+        // New DeleteAndRevokeAsync method
+        public async Task RevokeAndDeleteAsync(Guid companyId)
         {
+            // Fetch tokens for the given company
             var tokens = await _context.AccountVerificationTokens
                 .Where(t => t.CompanyId == companyId)
                 .ToListAsync();
 
             if (tokens.Any())
             {
+                // First: Revoke each token (mark as used)
+                foreach (var token in tokens)
+                {
+                    token.IsUsed = true;
+                }
+
+                // Save the changes to mark tokens as used (revoked)
+                await _context.SaveChangesAsync();
+
+                // Second: Now delete the tokens from the table
                 _context.AccountVerificationTokens.RemoveRange(tokens);
                 await _context.SaveChangesAsync();
+
+                // Log the revocation and deletion
+                _logger.LogInformation("All account verification tokens for company {CompanyId} have been revoked and deleted.", companyId);
+            }
+            else
+            {
+                _logger.LogWarning("No tokens found for company {CompanyId} to revoke and delete.", companyId);
             }
         }
     }

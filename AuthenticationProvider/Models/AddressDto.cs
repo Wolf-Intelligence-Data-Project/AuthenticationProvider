@@ -2,7 +2,7 @@
 
 namespace AuthenticationProvider.Models;
 
-public class AddressRequest
+public class AddressDto
 {
     [Required(ErrorMessage = "Gatuadress är obligatorisk.")]
     public string StreetAddress { get; set; } = string.Empty;
@@ -17,5 +17,5 @@ public class AddressRequest
 
     [Required(ErrorMessage = "Region är obligatorisk.")]
     [EnumDataType(typeof(Region), ErrorMessage = "Välj en giltig region.")]
-    public Region Region { get; set; } // Non-nullable if you want it to be required
+    public Region Region { get; set; } // Region is required in AddressDto
 }
