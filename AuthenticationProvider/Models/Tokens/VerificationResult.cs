@@ -1,11 +1,10 @@
-﻿namespace AuthenticationProvider.Models.Tokens
+﻿namespace AuthenticationProvider.Models.Tokens;
+
+public enum VerificationResult
 {
-    public enum VerificationResult
-    {
-        Success,
-        InvalidToken,
-        EmailNotFound,
-        CompanyNotFound,
-        AlreadyVerified
-    }
+    Success,
+    InvalidToken,
+    EmailNotFound,
+    CompanyNotFound,
+    AlreadyVerified
 }

@@ -1,6 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using AuthenticationProvider.Models;
+using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models;
+namespace AuthenticationProvider.Data.Dtos;
 
 public class AddressDto
 {

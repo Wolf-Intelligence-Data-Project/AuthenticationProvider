@@ -1,9 +1,10 @@
-﻿using System.Threading.Tasks;
-using AuthenticationProvider.Models.SignIn;
+﻿using AuthenticationProvider.Models.Responses;
+using AuthenticationProvider.Data.Dtos;
+using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Services;
 
 public interface ISignInService
 {
-    Task<SignInResponse> SignInAsync(SignInRequest request);
+    Task<SignInResponse> SignInAsync(SignInDto signInDto);
 }

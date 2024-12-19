@@ -1,88 +1,91 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignIn;
-using AuthenticationProvider.Models.SignUp;
+﻿using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Models.Responses;
+using AuthenticationProvider.Data.Dtos;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;
-using System.Text.RegularExpressions;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using AuthenticationProvider.Models;
+using System.Threading.Tasks;
+using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Data;
 
-namespace AuthenticationProvider.Services;
-
-public class SignInService : ISignInService
+namespace AuthenticationProvider.Services
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly IAccountVerificationService _accountVerificationService;
-    private readonly IAccountVerificationTokenService _accountVerificationTokenService;
-    private readonly IAccessTokenService _accessTokenService;  // AccessTokenService
-
-    public SignInService(
-        UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
-        IAccountVerificationService accountVerificationService,
-        IAccountVerificationTokenService accountVerificationTokenService,
-        IAccessTokenService accessTokenService)  // Inject AccessTokenService
+    public class SignInService : ISignInService
     {
-        _userManager = userManager;
-        _signInManager = signInManager;
-        _accountVerificationService = accountVerificationService;
-        _accountVerificationTokenService = accountVerificationTokenService;
-        _accessTokenService = accessTokenService;  // Initialize AccessTokenService
-    }
+        private readonly ICompanyRepository _companyRepository;
+        private readonly IAccessTokenService _accessTokenService;
+        private readonly IPasswordHasher<ApplicationUser> _passwordHasher;  // Dependency injection for PasswordHasher
+        private readonly ILogger<SignInService> _logger;
 
-    public async Task<SignInResponse> SignInAsync(SignInRequest request)
-    {
-        // Validate the SignInRequest model
-        var validationResults = ValidateModel(request);
-        if (validationResults.Any())
+        public SignInService(
+            ICompanyRepository companyRepository,
+            IAccessTokenService accessTokenService,
+            IPasswordHasher<ApplicationUser> passwordHasher,  // Injecting PasswordHasher
+            ILogger<SignInService> logger)
         {
-            return new SignInResponse
-            {
-                Success = false,
-                ErrorMessage = string.Join(", ", validationResults)
-            };
+            _companyRepository = companyRepository;
+            _accessTokenService = accessTokenService;
+            _passwordHasher = passwordHasher;
+            _logger = logger;
         }
 
-        // Find the user by email
-        var user = await _userManager.FindByEmailAsync(request.Email);
-        if (user == null || !user.EmailConfirmed)
+        public async Task<SignInResponse> SignInAsync(SignInDto signInDto)
         {
+            // Try to find the company (CompanyEntity) by email from the SignInDto
+            var companyEntity = await _companyRepository.GetByEmailAsync(signInDto.Email);
+            if (companyEntity == null)
+            {
+                return new SignInResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Företaget finns inte." // "The company does not exist."
+                };
+            }
+
+            // Create an ApplicationUser from the CompanyEntity (mapping relevant fields)
+            var applicationUser = new ApplicationUser
+            {
+                Id = companyEntity.Id.ToString(), // Convert Guid to string for IdentityUser
+                UserName = companyEntity.Email, // Map the email to the username field
+                Email = companyEntity.Email,
+                PasswordHash = companyEntity.PasswordHash, // Assuming password hash is stored in CompanyEntity
+                CompanyName = companyEntity.CompanyName, // Map additional fields
+                OrganisationNumber = companyEntity.OrganisationNumber,
+                IsVerified = companyEntity.IsVerified
+            };
+
+            // Validate the password by comparing the hashed version using PasswordHasher
+            var passwordValid = _passwordHasher.VerifyHashedPassword(applicationUser, applicationUser.PasswordHash, signInDto.Password);
+            if (passwordValid != PasswordVerificationResult.Success)
+            {
+                return new SignInResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Felaktiga inloggningsuppgifter." // "Incorrect login credentials."
+                };
+            }
+
+            // Check if the company is verified
+            if (!companyEntity.IsVerified)
+            {
+                return new SignInResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Företaget är inte verifierat." // "The company is not verified."
+                };
+            }
+
+            // Generate the access token using the access token service (with ApplicationUser)
+            var token = _accessTokenService.GenerateAccessToken(applicationUser); // Pass ApplicationUser
+
             return new SignInResponse
             {
-                Success = false,
-                ErrorMessage = "Invalid email or password, or email not verified."
+                Success = true,
+                Token = token,
+                Message = "Inloggning lyckades.", // "Login successful."
+                User = applicationUser // Return the original CompanyEntity as the user
             };
         }
-
-        // Attempt to sign in the user
-        var result = await _signInManager.PasswordSignInAsync(user, request.Password, false, false);
-        if (!result.Succeeded)
-        {
-            return new SignInResponse
-            {
-                Success = false,
-                ErrorMessage = "Invalid email or password."
-            };
-        }
-
-        // Generate the access token for authenticated user (using AccessTokenService)
-        var accessToken = _accessTokenService.GenerateAccessToken(user);  // Generate token here
-
-        return new SignInResponse
-        {
-            Success = true,
-            Token = accessToken // Return token in response
-        };
-    }
-
-    // Helper method to validate the request model
-    private List<string> ValidateModel(object model)
-    {
-        var validationResults = new List<ValidationResult>();
-        var context = new ValidationContext(model, serviceProvider: null, items: null);
-        bool isValid = Validator.TryValidateObject(model, context, validationResults, validateAllProperties: true);
-
-        return validationResults.Select(result => result.ErrorMessage).ToList();
     }
 }

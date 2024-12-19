@@ -6,7 +6,11 @@ using AuthenticationProvider.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;  // Add this namespace
-using AuthenticationProvider.Models;  // Make sure this namespace contains your ApplicationUser class
+using AuthenticationProvider.Models;
+using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Services.Clients;
+using AuthenticationProvider.Services.Tokens;
+using AuthenticationProvider.Interfaces.Services;  // Make sure this namespace contains your ApplicationUser class
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +33,7 @@ builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerification
 builder.Services.AddScoped<IAccountVerificationService, AccountVerificationService>();
 
 builder.Services.AddScoped<IAccessTokenService, AccessTokenService>();
+builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 
 builder.Services.AddScoped<ISignInService, SignInService>();
 builder.Services.AddScoped<ISignUpService, SignUpService>();
@@ -45,10 +50,6 @@ builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-
-
-// Register TokenRevocationService
-builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
@@ -96,7 +97,9 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 // Start the application

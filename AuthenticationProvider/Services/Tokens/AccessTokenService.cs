@@ -1,0 +1,149 @@
+﻿using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Data;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Concurrent;
+using System.Linq;
+
+namespace AuthenticationProvider.Services.Tokens
+{
+    public class AccessTokenService : IAccessTokenService
+    {
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<AccessTokenService> _logger;
+
+        // In-memory storage for access tokens using a ConcurrentDictionary
+        private static readonly ConcurrentDictionary<string, string> _tokenStore = new ConcurrentDictionary<string, string>();
+
+        // In-memory blacklist for revoked tokens
+        private static readonly ConcurrentDictionary<string, bool> _blacklistedTokens = new ConcurrentDictionary<string, bool>();
+
+        public AccessTokenService(
+            IConfiguration configuration,
+            ILogger<AccessTokenService> logger)
+        {
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        public string GenerateAccessToken(ApplicationUser user)
+        {
+            if (user == null)
+                throw new ArgumentNullException(nameof(user), "User cannot be null.");
+
+            // Retrieve the JWT configuration values
+            var secretKey = _configuration["Jwt:Key"];
+            var issuer = _configuration["Jwt:Issuer"];
+
+            // Check for null or empty values in the configuration
+            if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
+            {
+                _logger.LogError("JWT configuration values are missing. Ensure 'Jwt:Key' and 'Jwt:Issuer' are set in the configuration.");
+                throw new InvalidOperationException("JWT configuration values are missing.");
+            }
+
+            var claims = new[] {
+        new Claim(ClaimTypes.Name, user.UserName),
+        new Claim("companyId", user.Id),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+    };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: issuer,
+                claims: claims,
+                expires: DateTime.Now.AddHours(1), // Configurable expiration
+                signingCredentials: creds
+            );
+
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+            // Store the token in-memory with userId as the key
+            _tokenStore[user.Id] = tokenString;
+
+            return tokenString;
+        }
+
+
+        public string GetToken(string userId)
+        {
+            // Retrieve the token from in-memory storage
+            _tokenStore.TryGetValue(userId, out var token);
+            return token;
+        }
+
+        public void RevokeAccessToken(string token)
+        {
+            try
+            {
+                var userId = GetUserIdFromToken(token);
+                if (userId != null)
+                {
+                    // Add the token to the blacklist to prevent further usage
+                    _blacklistedTokens[token] = true;
+
+                    // Remove the token from in-memory storage (if you use that approach)
+                    _tokenStore.TryRemove(userId, out _);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error revoking token: {ex.Message}");
+            }
+        }
+
+
+        public string GetUserIdFromToken(string token)
+        {
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var jsonToken = handler.ReadToken(token) as JwtSecurityToken;
+
+                var userIdClaim = jsonToken?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+                return userIdClaim?.Value;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error decoding token: {ex.Message}");
+                return null; // Invalid token or error in decoding
+            }
+        }
+
+        public bool IsTokenValid(string token)
+        {
+            try
+            {
+                if (_blacklistedTokens.ContainsKey(token))
+                {
+                    _logger.LogWarning($"Token has been blacklisted: {token}");
+                    return false;
+                }
+
+                var handler = new JwtSecurityTokenHandler();
+                handler.ValidateToken(token, new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateLifetime = true,
+                    ValidIssuer = _configuration["Jwt:Issuer"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]))
+                }, out _);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Token validation failed: {ex.Message}");
+                return false;
+            }
+        }
+
+    }
+}

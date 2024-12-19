@@ -4,9 +4,10 @@ using System;
 using System.Threading.Tasks;
 using AuthenticationProvider.Models;
 using AuthenticationProvider.Data;
-using AuthenticationProvider.Repositories;  // Include the CompanyRepository
+using AuthenticationProvider.Repositories;
+using AuthenticationProvider.Interfaces.Repositories;
 
-namespace AuthenticationProvider.Services
+namespace AuthenticationProvider.Services.Clients
 {
     public class ResetPasswordService : IResetPasswordService
     {
@@ -78,7 +79,7 @@ namespace AuthenticationProvider.Services
         /// </summary>
         /// <param name="resetPasswordRequest">The request containing the token and the new password.</param>
         /// <returns>True if the password is successfully reset; otherwise, false.</returns>
-        public async Task<bool> ResetPasswordAsync(ResetPasswordRequest resetPasswordRequest)
+        public async Task<bool> ResetPasswordAsync(ResetPasswordDto resetPasswordRequest)
         {
             if (string.IsNullOrWhiteSpace(resetPasswordRequest.Token) ||
                 string.IsNullOrWhiteSpace(resetPasswordRequest.NewPassword) ||
@@ -104,7 +105,7 @@ namespace AuthenticationProvider.Services
                     return false; // Token invalid or expired
                 }
 
-             
+
                 // Hash the new password before updating
                 var hashedPassword = HashPassword(resetPasswordRequest.NewPassword);
 

@@ -1,5 +1,4 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignUp;
 using AuthenticationProvider.Models;
 using Microsoft.Extensions.Logging;
 using System;
@@ -7,6 +6,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
+using AuthenticationProvider.Data.Dtos;
+using AuthenticationProvider.Models.Responses;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 
 namespace AuthenticationProvider.Services
 {
@@ -17,7 +20,7 @@ namespace AuthenticationProvider.Services
         private readonly IAccountVerificationService _accountVerificationService;
         private readonly IAddressRepository _addressRepository;
         private readonly ILogger<SignUpService> _logger;
-        private readonly PasswordHasher<Company> _passwordHasher;
+        private readonly PasswordHasher<CompanyEntity> _passwordHasher;
 
         public SignUpService(
             ICompanyRepository companyRepository,
@@ -31,10 +34,10 @@ namespace AuthenticationProvider.Services
             _accountVerificationService = accountVerificationService;
             _addressRepository = addressRepository;
             _logger = logger;
-            _passwordHasher = new PasswordHasher<Company>();
+            _passwordHasher = new PasswordHasher<CompanyEntity>();
         }
 
-        public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
+        public async Task<SignUpResponse> RegisterCompanyAsync(SignUpDto request)
         {
             // Validation Logic
             ValidateSignUpRequest(request);
@@ -49,7 +52,7 @@ namespace AuthenticationProvider.Services
             string hashedPassword = _passwordHasher.HashPassword(null, request.Password);
 
             // Create new company object
-            var company = new Company
+            var company = new CompanyEntity
             {
                 OrganisationNumber = request.OrganisationNumber,
                 CompanyName = request.CompanyName,
@@ -99,10 +102,10 @@ namespace AuthenticationProvider.Services
             _logger.LogInformation($"Företaget med ID {companyId} har raderats.");
         }
 
-        private async Task AddAddressesAsync(SignUpRequest request, Company company)
+        private async Task AddAddressesAsync(SignUpDto request, CompanyEntity company)
         {
             // Add primary address
-            var primaryAddress = new Address
+            var primaryAddress = new AddressEntity
             {
                 StreetAddress = request.PrimaryAddress.StreetAddress,
                 City = request.PrimaryAddress.City,
@@ -118,7 +121,7 @@ namespace AuthenticationProvider.Services
             // Add additional addresses
             foreach (var additionalAddress in request.AdditionalAddresses)
             {
-                var address = new Address
+                var address = new AddressEntity
                 {
                     StreetAddress = additionalAddress.StreetAddress,
                     City = additionalAddress.City,
@@ -133,7 +136,7 @@ namespace AuthenticationProvider.Services
             }
         }
 
-        private void ValidateSignUpRequest(SignUpRequest request)
+        private void ValidateSignUpRequest(SignUpDto request)
         {
             // Organisation Number (10 digits)
             if (!Regex.IsMatch(request.OrganisationNumber, @"^\d{10}$"))

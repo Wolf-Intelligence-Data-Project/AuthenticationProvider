@@ -1,11 +1,12 @@
-﻿using System;
+﻿using AuthenticationProvider.Models;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AuthenticationProvider.Models;
+namespace AuthenticationProvider.Data.Entities;
 
-public class Company
+public class CompanyEntity
 {
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -24,7 +25,7 @@ public class Company
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    public BusinessType BusinessType { get; set; } = BusinessType.Unspecified;
+    public BusinessType BusinessType { get; set; }
 
     [Required]
     [StringLength(100)]
@@ -43,10 +44,10 @@ public class Company
     public int? PrimaryAddressId { get; set; } // Optional
 
     [ForeignKey("PrimaryAddressId")]
-    public Address? PrimaryAddress { get; set; } // Optional
+    public AddressEntity? PrimaryAddress { get; set; } // Optional
 
     // All other addresses associated with the company
-    public ICollection<Address> Addresses { get; set; } = new List<Address>();
+    public ICollection<AddressEntity> Addresses { get; set; } = new List<AddressEntity>();
 
     [Required]
     [StringLength(100)]

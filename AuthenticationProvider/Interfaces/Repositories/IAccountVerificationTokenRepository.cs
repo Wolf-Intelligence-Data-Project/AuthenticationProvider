@@ -1,16 +1,16 @@
-﻿using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Data.Entities;
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces
+namespace AuthenticationProvider.Interfaces.Repositories
 {
     public interface IAccountVerificationTokenRepository
     {
         // Method to create a token
-        Task<AccountVerificationToken> CreateAsync(AccountVerificationToken token);
+        Task<AccountVerificationTokenEntity> CreateAsync(AccountVerificationTokenEntity token);
 
         // Method to retrieve a token by its string representation
-        Task<AccountVerificationToken> GetByTokenAsync(string token);
+        Task<AccountVerificationTokenEntity> GetByTokenAsync(string token);
 
         // Method to mark a token as used
         Task MarkAsUsedAsync(Guid tokenId);

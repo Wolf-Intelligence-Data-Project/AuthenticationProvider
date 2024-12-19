@@ -1,6 +1,6 @@
 ﻿using AuthenticationProvider.Data;
-using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 using Azure;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
@@ -22,7 +22,7 @@ public class CompanyRepository : ICompanyRepository
     {
         try
         {
-            return await _context.Set<Company>()
+            return await _context.Set<CompanyEntity>()
                 .AnyAsync(c => c.OrganisationNumber == organisationNumber || c.Email == email); // Check for either OrganisationNumber or Email
         }
         catch (Exception ex)
@@ -38,12 +38,12 @@ public class CompanyRepository : ICompanyRepository
     }
 
     // Add a new company
-    public async Task AddAsync(Company company)
+    public async Task AddAsync(CompanyEntity company)
     {
         try
         {
             // Check if company with same organisation number or email already exists
-            bool companyExists = await _context.Set<Company>()
+            bool companyExists = await _context.Set<CompanyEntity>()
                 .AnyAsync(c => c.OrganisationNumber == company.OrganisationNumber || c.Email == company.Email);
 
             if (companyExists)
@@ -51,7 +51,7 @@ public class CompanyRepository : ICompanyRepository
                 throw new InvalidOperationException("Företaget med samma organisationsnummer eller e-postadress existerar redan.");  // "The company with the same organisation number or email already exists."
             }
 
-            await _context.Set<Company>().AddAsync(company);
+            await _context.Set<CompanyEntity>().AddAsync(company);
             await _context.SaveChangesAsync();
         }
         catch (Exception ex)
@@ -67,18 +67,18 @@ public class CompanyRepository : ICompanyRepository
     }
 
     // Update an existing company
-    public async Task UpdateAsync(Company company)
+    public async Task UpdateAsync(CompanyEntity company)
     {
         try
         {
-            var existingCompany = await _context.Set<Company>().FindAsync(company.Id);
+            var existingCompany = await _context.Set<CompanyEntity>().FindAsync(company.Id);
 
             if (existingCompany == null)
             {
                 throw new InvalidOperationException("Företaget finns inte.");  // "The company does not exist."
             }
 
-            _context.Set<Company>().Update(company);
+            _context.Set<CompanyEntity>().Update(company);
             await _context.SaveChangesAsync();
         }
         catch (Exception ex)
@@ -94,11 +94,11 @@ public class CompanyRepository : ICompanyRepository
     }
 
     // Retrieve a company by email
-    public async Task<Company> GetByEmailAsync(string email)
+    public async Task<CompanyEntity> GetByEmailAsync(string email)
     {
         try
         {
-            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Email == email);
+            return await _context.Set<CompanyEntity>().FirstOrDefaultAsync(c => c.Email == email);
         }
         catch (Exception ex)
         {
@@ -112,11 +112,11 @@ public class CompanyRepository : ICompanyRepository
         }
     }
     // Add this method to the CompanyRepository
-    public async Task<Company> GetByIdAsync(Guid companyId)
+    public async Task<CompanyEntity> GetByIdAsync(Guid companyId)
     {
         try
         {
-            return await _context.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId);
+            return await _context.Set<CompanyEntity>().FirstOrDefaultAsync(c => c.Id == companyId);
         }
         catch (Exception ex)
         {

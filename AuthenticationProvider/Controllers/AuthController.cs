@@ -1,59 +1,73 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignIn;
-using AuthenticationProvider.Services;
+﻿using AuthenticationProvider.Data.Dtos;
+using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
+using System;
 
-[Route("api/[controller]")]
-[ApiController]
-public class AuthController : ControllerBase
+namespace AuthenticationProvider.Controllers
 {
-    private readonly ISignInService _signInService;
-    private readonly ISignOutService _signOutService;
-    private readonly IAccessTokenService _accessTokenService;
-
-    public AuthController(ISignInService signInService, ISignOutService signOutService, IAccessTokenService accessTokenService)
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AuthController : ControllerBase
     {
-        _signInService = signInService;
-        _signOutService = signOutService;
-        _accessTokenService = accessTokenService;
+        private readonly ISignInService _signInService;
+        private readonly ISignOutService _signOutService;
+        private readonly IAccessTokenService _accessTokenService;
+
+        public AuthController(ISignInService signInService, ISignOutService signOutService, IAccessTokenService accessTokenService)
+        {
+            _signInService = signInService;
+            _signOutService = signOutService;
+            _accessTokenService = accessTokenService;
+        }
+
+        // Login endpoint
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] SignInDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { message = "Invalid input", errors = ModelState });
+            }
+
+            var response = await _signInService.SignInAsync(request);
+            if (response.Success)
+            {
+                return Ok(new
+                {
+                    message = "Login successful",
+                    token = response.Token,
+                    user = new { response.User.UserName, response.User.Email }
+                });
+            }
+
+            return Unauthorized(new { message = "Felaktiga inloggningsuppgifter." });
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout([FromHeader] string Authorization)
+        {
+            if (string.IsNullOrEmpty(Authorization))
+            {
+                return BadRequest(new { message = "No token provided." });
+            }
+
+            var token = Authorization.StartsWith("Bearer ") ? Authorization.Substring(7) : Authorization;
+
+            // Revoke the token first
+            _accessTokenService.RevokeAccessToken(token);
+
+            // Now, proceed to validate or return success
+            if (!_accessTokenService.IsTokenValid(token))
+            {
+                return Unauthorized(new { message = "Token is invalid or expired." });
+            }
+
+            return Ok(new { message = "Logged out successfully." });
+        }
+
+
+
+
     }
-
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] SignInRequest request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState); // If model is invalid, return validation errors
-        }
-
-        var response = await _signInService.SignInAsync(request);
-        if (response.Success)
-        {
-            // Return the token generated in the SignInService
-            return Ok(new { Token = response.Token });
-        }
-
-        return Unauthorized("Felaktiga inloggningsuppgifter."); // Translation for error message
-    }
-
-    [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromHeader] string token)
-    {
-        if (string.IsNullOrEmpty(token))
-        {
-            return BadRequest("Token krävs för utloggning.");
-        }
-
-        // Revoke the access token using AccessTokenService
-        _accessTokenService.RevokeAccessToken(token);
-
-        var result = await _signOutService.SignOutAsync(token);
-        if (result)
-        {
-            return Ok("Utloggning lyckades.");
-        }
-
-        return BadRequest("Misslyckades med att logga ut. Token kan redan vara ogiltig eller saknas.");
-    }
-
 }

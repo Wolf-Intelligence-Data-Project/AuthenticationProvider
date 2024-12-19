@@ -1,5 +1,5 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.SignUp;
+﻿using AuthenticationProvider.Data.Dtos;
+using AuthenticationProvider.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
@@ -22,7 +22,7 @@ public class SignUpController : ControllerBase
 
     // POST: /api/SignUp/register
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] SignUpRequest request)
+    public async Task<IActionResult> Register([FromBody] SignUpDto request)
     {
         _logger.LogInformation("Register endpoint called.");
 

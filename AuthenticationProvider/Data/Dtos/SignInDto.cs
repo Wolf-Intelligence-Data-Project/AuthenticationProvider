@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.SignIn;
+namespace AuthenticationProvider.Data.Dtos;
 
-public class SignInRequest
+public class SignInDto
 {
     // Email address for the company
     [Required(ErrorMessage = "E-postadress krävs.")]

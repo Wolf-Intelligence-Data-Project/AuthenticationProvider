@@ -2,7 +2,7 @@
 using System.Text;
 using System.Net.Http;
 
-namespace AuthenticationProvider.Services;
+namespace AuthenticationProvider.Services.Clients;
 
 public class AccountVerificationClient(HttpClient httpClient)
 {

@@ -1,5 +1,4 @@
 ﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -8,10 +7,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
-using AuthenticationProvider.Repositories;
 using System.Security.Claims;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 
-namespace AuthenticationProvider.Services
+namespace AuthenticationProvider.Services.Tokens
 {
     public class ResetPasswordTokenService : IResetPasswordTokenService
     {
@@ -82,7 +82,7 @@ namespace AuthenticationProvider.Services
             var tokenString = tokenHandler.WriteToken(jwtToken);
 
             // Save the token in the database
-            var resetPasswordToken = new ResetPasswordToken
+            var resetPasswordToken = new ResetPasswordTokenEntity
             {
                 Token = tokenString,
                 CompanyId = companyId,
@@ -147,7 +147,7 @@ namespace AuthenticationProvider.Services
             return password;
         }
 
-        public async Task<ResetPasswordToken> GetValidResetPasswordTokenAsync(string token)
+        public async Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
             {

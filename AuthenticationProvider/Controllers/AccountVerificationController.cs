@@ -1,4 +1,5 @@
 ﻿using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Models.Tokens; // Assuming you have the Company entity
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;

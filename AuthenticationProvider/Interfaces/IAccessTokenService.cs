@@ -1,10 +1,14 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using AuthenticationProvider.Data;
+using AuthenticationProvider.Data.Entities;
 
-namespace AuthenticationProvider.Interfaces;
-
-public interface IAccessTokenService
+namespace AuthenticationProvider.Interfaces.Services
 {
-    string GenerateAccessToken(IdentityUser user);
-    void RevokeAccessToken(string userId);
-    string GetToken(string userId);
+    public interface IAccessTokenService
+    {
+        string GenerateAccessToken(ApplicationUser user);
+        string GetToken(string userId);
+        void RevokeAccessToken(string userId);
+        string GetUserIdFromToken(string token);
+        bool IsTokenValid(string token);
+    }
 }

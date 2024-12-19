@@ -1,5 +1,4 @@
-﻿using AuthenticationProvider.Models;
-using AuthenticationProvider.Models.Tokens;
+﻿using AuthenticationProvider.Data.Entities;
 using System;
 using System.Threading.Tasks;
 
@@ -32,7 +31,7 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="token">The token to retrieve and validate.</param>
     /// <returns>A valid account verification token if available, or null if invalid/expired/used.</returns>
-    Task<AccountVerificationToken> GetValidAccountVerificationTokenAsync(string token);
+    Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token);
 
     /// <summary>
     /// Deletes all account verification tokens associated with a company.

@@ -1,5 +1,6 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -9,7 +10,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Services
+namespace AuthenticationProvider.Services.Tokens
 {
     public class AccountVerificationTokenService : IAccountVerificationTokenService
     {
@@ -79,7 +80,7 @@ namespace AuthenticationProvider.Services
             var tokenString = tokenHandler.WriteToken(jwtToken);
 
             // Save the token in the database
-            var accountVerificationToken = new AccountVerificationToken
+            var accountVerificationToken = new AccountVerificationTokenEntity
             {
                 Token = tokenString,
                 CompanyId = companyId,
@@ -121,7 +122,7 @@ namespace AuthenticationProvider.Services
             }
         }
 
-        public async Task<AccountVerificationToken> GetValidAccountVerificationTokenAsync(string token)
+        public async Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
             {

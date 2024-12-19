@@ -1,4 +1,5 @@
-﻿using AuthenticationProvider.Models.SignUp;
+﻿using AuthenticationProvider.Data.Dtos;
+using AuthenticationProvider.Models.Responses;
 using System;
 using System.Threading.Tasks;
 
@@ -6,6 +7,6 @@ namespace AuthenticationProvider.Interfaces;
 
 public interface ISignUpService
 {
-    Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request);
+    Task<SignUpResponse> RegisterCompanyAsync(SignUpDto request);
     Task DeleteCompanyAsync(Guid companyId);
 }

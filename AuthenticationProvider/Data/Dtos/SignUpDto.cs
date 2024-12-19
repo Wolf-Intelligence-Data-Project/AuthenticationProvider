@@ -1,8 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using AuthenticationProvider.Models;
+using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.SignUp;
+namespace AuthenticationProvider.Data.Dtos;
 
-public class SignUpRequest
+public class SignUpDto
 {
     [Required]
     [StringLength(10, MinimumLength = 10, ErrorMessage = "Organisationsnummer måste vara exakt 10 siffror.")]

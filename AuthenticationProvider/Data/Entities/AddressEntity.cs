@@ -1,8 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using AuthenticationProvider.Models;
+using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models
+namespace AuthenticationProvider.Data.Entities
 {
-    public class Address
+    public class AddressEntity
     {
         [Key]
         public int Id { get; set; }
@@ -22,7 +23,7 @@ namespace AuthenticationProvider.Models
         [Required]
         public Guid CompanyId { get; set; }
 
-        public Company? Company { get; set; }
+        public CompanyEntity? Company { get; set; }
 
         [Required]
         public string AddressType { get; set; }

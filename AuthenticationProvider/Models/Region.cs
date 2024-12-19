@@ -4,6 +4,9 @@ namespace AuthenticationProvider.Models;
 
 public enum Region
 {
+    [Display(Name = "")]
+    Unspecified = 0, // Before typing or choosing the region
+
     [Display(Name = "Stockholm")]
     Stockholm = 1,
 

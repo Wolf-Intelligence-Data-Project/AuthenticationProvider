@@ -1,11 +1,12 @@
 ﻿using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Models.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Services
+namespace AuthenticationProvider.Services.Clients
 {
     public class AccountVerificationService : IAccountVerificationService
     {

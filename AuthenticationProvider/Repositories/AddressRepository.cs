@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Interfaces;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using AuthenticationProvider.Data;
-using AuthenticationProvider.Models;
 using System.Linq;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 
 namespace AuthenticationProvider.Repositories;
 
@@ -16,7 +16,7 @@ public class AddressRepository : IAddressRepository
     }
 
     // Add a new address to the database
-    public async Task AddAsync(Address address)
+    public async Task AddAsync(AddressEntity address)
     {
         // Ensure address uniqueness: Same street address, postal code, and city should not exist for the same company
         bool isAddressUnique = !await _dbContext.Addresses
@@ -48,7 +48,7 @@ public class AddressRepository : IAddressRepository
     }
 
     // Get an address by its ID
-    public async Task<Address> GetByIdAsync(int id)
+    public async Task<AddressEntity> GetByIdAsync(int id)
     {
         return await _dbContext.Addresses
                                .AsNoTracking()
@@ -56,7 +56,7 @@ public class AddressRepository : IAddressRepository
     }
 
     // Get all addresses for a specific company
-    public async Task<ICollection<Address>> GetAddressesByCompanyIdAsync(Guid companyId)  // Update to use Guid for companyId
+    public async Task<ICollection<AddressEntity>> GetAddressesByCompanyIdAsync(Guid companyId)  // Update to use Guid for companyId
     {
         return await _dbContext.Addresses
                                .Where(a => a.CompanyId == companyId)  // Correct comparison with Guid
@@ -64,7 +64,7 @@ public class AddressRepository : IAddressRepository
     }
 
     // Update an existing address
-    public async Task UpdateAsync(Address address)
+    public async Task UpdateAsync(AddressEntity address)
     {
         // If updating to Primary address, ensure no other primary address exists
         if (address.AddressType == "Primary")

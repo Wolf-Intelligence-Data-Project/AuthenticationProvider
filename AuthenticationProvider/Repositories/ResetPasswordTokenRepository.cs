@@ -1,5 +1,6 @@
 ﻿using AuthenticationProvider.Data;
-using AuthenticationProvider.Models;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
@@ -15,18 +16,18 @@ namespace AuthenticationProvider.Repositories
         {
             _context = context;
         }
-        public async Task<ResetPasswordToken> GetByIdAsync(Guid id)
+        public async Task<ResetPasswordTokenEntity> GetByIdAsync(Guid id)
         {
             return await _context.ResetPasswordTokens
                 .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > DateTime.UtcNow && !t.IsUsed);
         }
-        public async Task<ResetPasswordToken> GetByTokenAsync(string token)
+        public async Task<ResetPasswordTokenEntity> GetByTokenAsync(string token)
         {
             return await _context.ResetPasswordTokens
                 .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > DateTime.UtcNow && !t.IsUsed);
         }
 
-        public async Task<ResetPasswordToken> CreateAsync(ResetPasswordToken token)
+        public async Task<ResetPasswordTokenEntity> CreateAsync(ResetPasswordTokenEntity token)
         {
             _context.ResetPasswordTokens.Add(token);
             await _context.SaveChangesAsync();

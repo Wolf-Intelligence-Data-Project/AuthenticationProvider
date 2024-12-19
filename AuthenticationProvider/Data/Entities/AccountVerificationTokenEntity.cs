@@ -1,6 +1,6 @@
-﻿namespace AuthenticationProvider.Models;
+﻿namespace AuthenticationProvider.Data.Entities;
 
-public class ResetPasswordToken
+public class AccountVerificationTokenEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid CompanyId { get; set; }
@@ -9,5 +9,5 @@ public class ResetPasswordToken
     public bool IsUsed { get; set; } = false;
 
     // Navigation property to Company
-    public Company Company { get; set; }
+    public CompanyEntity Company { get; set; }
 }

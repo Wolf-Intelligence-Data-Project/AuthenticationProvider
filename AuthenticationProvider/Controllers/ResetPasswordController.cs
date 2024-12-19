@@ -64,7 +64,7 @@ namespace AuthenticationProvider.Controllers
 
         // Endpoint to reset the password
         [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordRequest)
         {
             if (resetPasswordRequest == null || string.IsNullOrEmpty(resetPasswordRequest.Token) ||
                 string.IsNullOrEmpty(resetPasswordRequest.NewPassword) ||

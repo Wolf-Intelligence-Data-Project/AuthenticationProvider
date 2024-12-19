@@ -1,4 +1,4 @@
-﻿namespace AuthenticationProvider.Models.SignUp;
+﻿namespace AuthenticationProvider.Models.Responses;
 
 public class SignUpResponse
 {
