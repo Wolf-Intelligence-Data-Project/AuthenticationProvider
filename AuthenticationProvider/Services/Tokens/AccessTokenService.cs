@@ -130,9 +130,15 @@ namespace AuthenticationProvider.Services.Tokens
                 var handler = new JwtSecurityTokenHandler();
                 handler.ValidateToken(token, new TokenValidationParameters
                 {
+                    // Disable audience validation
+                    ValidateAudience = false, // Set this to false to skip audience validation
+
+                    // Still validate issuer and signing key
                     ValidateIssuer = true,
-                    ValidateLifetime = true,
                     ValidIssuer = _configuration["Jwt:Issuer"],
+
+                    ValidateLifetime = true,
+
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]))
                 }, out _);
 
@@ -144,6 +150,7 @@ namespace AuthenticationProvider.Services.Tokens
                 return false;
             }
         }
+
 
     }
 }

@@ -47,17 +47,30 @@ namespace AuthenticationProvider.Controllers
         [HttpPost("logout")]
         public IActionResult Logout([FromHeader] string Authorization)
         {
+            // Log the received Authorization header for debugging purposes
+            Console.WriteLine($"Received Authorization Header: {Authorization}");
+
             if (string.IsNullOrEmpty(Authorization))
             {
                 return BadRequest(new { message = "No token provided." });
             }
 
-            var token = Authorization.StartsWith("Bearer ") ? Authorization.Substring(7) : Authorization;
+            // Extract token from the Authorization header if it starts with "Bearer "
+            var token = Authorization?.StartsWith("Bearer ") == true
+                        ? Authorization.Substring(7).Trim() // Extract the token after 'Bearer '
+                        : string.Empty;
 
-            // Revoke the token first
+            if (string.IsNullOrEmpty(token))
+            {
+                return BadRequest(new { message = "Invalid token format." });
+            }
+
+            Console.WriteLine($"Extracted Token: {token}");
+
+            // Proceed with token validation...
+            // Call your logic for revoking the token and validating it
             _accessTokenService.RevokeAccessToken(token);
 
-            // Now, proceed to validate or return success
             if (!_accessTokenService.IsTokenValid(token))
             {
                 return Unauthorized(new { message = "Token is invalid or expired." });
@@ -65,8 +78,6 @@ namespace AuthenticationProvider.Controllers
 
             return Ok(new { message = "Logged out successfully." });
         }
-
-
 
 
     }

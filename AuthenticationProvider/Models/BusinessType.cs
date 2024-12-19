@@ -4,9 +4,6 @@ namespace AuthenticationProvider.Models;
 
 public enum BusinessType
 {
-    [Display(Name = "")]
-    Unspecified = 0, // Before typing or choosing the type
-
     [Display(Name = "Detaljhandel")]
     Retail = 1,
 
