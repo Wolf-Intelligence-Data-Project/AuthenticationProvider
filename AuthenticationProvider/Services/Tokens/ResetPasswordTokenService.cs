@@ -1,15 +1,15 @@
 ﻿using AuthenticationProvider.Interfaces;
-using System;
-using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Identity;
+using System;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace AuthenticationProvider.Services.Tokens
 {
@@ -19,6 +19,7 @@ namespace AuthenticationProvider.Services.Tokens
         private readonly ICompanyRepository _companyRepository;
         private readonly IConfiguration _configuration;
         private readonly ILogger<ResetPasswordTokenService> _logger;
+        private readonly PasswordHasher<CompanyEntity> _passwordHasher; // Add PasswordHasher
 
         public ResetPasswordTokenService(
             IResetPasswordTokenRepository resetPasswordTokenRepository,
@@ -30,25 +31,32 @@ namespace AuthenticationProvider.Services.Tokens
             _companyRepository = companyRepository;
             _configuration = configuration;
             _logger = logger;
+            _passwordHasher = new PasswordHasher<CompanyEntity>(); // Initialize PasswordHasher
         }
 
-        public async Task<string> CreateResetPasswordTokenAsync(Guid companyId)
+        public async Task<string> CreateResetPasswordTokenAsync(string email)
         {
-            var company = await _companyRepository.GetByIdAsync(companyId);
+            if (string.IsNullOrEmpty(email))
+            {
+                _logger.LogWarning("Email is null or empty.");
+                throw new ArgumentException("Email is required to generate reset password token.");
+            }
+
+            var company = await _companyRepository.GetByEmailAsync(email);
             if (company == null)
             {
-                _logger.LogWarning("Company not found: {CompanyId}", companyId);
-                throw new ArgumentException("Invalid company ID.");
+                _logger.LogWarning("Company not found with email: {Email}", email);
+                throw new ArgumentException("No company found with the provided email.");
             }
 
             if (string.IsNullOrEmpty(company.Email))
             {
-                _logger.LogWarning("Company email is null or empty: {CompanyId}", companyId);
+                _logger.LogWarning("Company email is null or empty: {CompanyId}", company.Id);
                 throw new ArgumentException("Company email is required to generate reset password token.");
             }
 
             // Delete existing tokens for the company
-            await _resetPasswordTokenRepository.DeleteAsync(companyId);
+            await _resetPasswordTokenRepository.DeleteAsync(company.Id);
 
             // Generate a new token
             var secretKey = _configuration["Jwt:Key"];
@@ -64,15 +72,14 @@ namespace AuthenticationProvider.Services.Tokens
 
             var tokenHandler = new JwtSecurityTokenHandler();
 
-            // Add both the email ('sub') and token type ('token_type') claims
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-            new Claim(ClaimTypes.NameIdentifier, companyId.ToString()),  // companyId as NameIdentifier claim
-            new Claim(ClaimTypes.Email, company.Email),                 // Email as Email claim
-            new Claim("token_type", "ResetPassword")             // Custom claim for token type
-            }),
+                    new Claim(ClaimTypes.NameIdentifier, company.Id.ToString()),
+                    new Claim(ClaimTypes.Email, company.Email),
+                    new Claim("token_type", "ResetPassword")
+                }),
                 Expires = DateTime.UtcNow.AddHours(1),
                 Issuer = issuer,
                 SigningCredentials = credentials
@@ -85,44 +92,15 @@ namespace AuthenticationProvider.Services.Tokens
             var resetPasswordToken = new ResetPasswordTokenEntity
             {
                 Token = tokenString,
-                CompanyId = companyId,
+                CompanyId = company.Id,
                 ExpiryDate = DateTime.UtcNow.AddHours(1),
                 IsUsed = false
             };
 
             await _resetPasswordTokenRepository.CreateAsync(resetPasswordToken);
-            _logger.LogInformation("Reset password token created for company: {CompanyId}", companyId);
+            _logger.LogInformation("Reset password token created for company: {CompanyId}", company.Id);
 
             return tokenString;
-        }
-
-
-        public async Task<bool> ValidateResetPasswordTokenAsync(string token)
-        {
-            var storedToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
-            if (storedToken == null || storedToken.IsUsed)
-            {
-                _logger.LogWarning("Invalid or expired reset password token: {Token}", token);
-                return false;
-            }
-
-            _logger.LogInformation("Valid reset password token found: {Token}", token);
-            return true;
-        }
-
-        public async Task MarkResetPasswordTokenAsUsedAsync(string token)
-        {
-            var storedToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
-            if (storedToken != null)
-            {
-                storedToken.IsUsed = true;
-                await _resetPasswordTokenRepository.MarkAsUsedAsync(storedToken.Id);
-                _logger.LogInformation("Reset password token marked as used: {TokenId}", storedToken.Id);
-            }
-            else
-            {
-                _logger.LogWarning("Attempted to mark a non-existent token as used: {Token}", token);
-            }
         }
 
         public async Task<bool> ResetCompanyPasswordAsync(string email, string newPassword)
@@ -134,17 +112,14 @@ namespace AuthenticationProvider.Services.Tokens
                 return false;
             }
 
-            company.PasswordHash = HashPassword(newPassword);
+            // Hash the new password using PasswordHasher
+            string hashedPassword = _passwordHasher.HashPassword(null, newPassword);
+
+            company.PasswordHash = hashedPassword;
             await _companyRepository.UpdateAsync(company);
 
             _logger.LogInformation("Password reset successfully for company: {CompanyId}", company.Id);
             return true;
-        }
-
-        private string HashPassword(string password)
-        {
-            // Temporarily returning normal password (development)
-            return password;
         }
 
         public async Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token)
@@ -180,6 +155,38 @@ namespace AuthenticationProvider.Services.Tokens
 
             // Return the valid token
             return resetPasswordToken;
+        }
+        public async Task<string> GetEmailFromTokenAsync(string token)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("Provided token is null or empty.");
+                throw new ArgumentException("Token is required.");
+            }
+
+            var resetPasswordToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
+            if (resetPasswordToken == null || resetPasswordToken.IsUsed)
+            {
+                _logger.LogWarning("Invalid or used reset password token: {Token}", token);
+                return null;
+            }
+
+            // Ensure the token is still valid
+            if (resetPasswordToken.ExpiryDate < DateTime.UtcNow)
+            {
+                _logger.LogWarning("The reset password token has expired. Token: {Token}", token);
+                return null;
+            }
+
+            // Fetch the company associated with the token
+            var company = await _companyRepository.GetByIdAsync(resetPasswordToken.CompanyId);
+            if (company == null)
+            {
+                _logger.LogWarning("No company found for the token: {Token}", token);
+                return null;
+            }
+
+            return company.Email;
         }
 
         public async Task MarkResetPasswordTokenAsUsedAsync(Guid tokenId)

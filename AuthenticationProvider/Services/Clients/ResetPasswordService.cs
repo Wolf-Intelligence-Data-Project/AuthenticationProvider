@@ -57,8 +57,6 @@ namespace AuthenticationProvider.Services.Clients
                 if (result)
                 {
                     _logger.LogInformation("Reset password email sent successfully.");
-                    // Optionally, mark the token as used after successful email send
-                    await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id);
                 }
                 else
                 {

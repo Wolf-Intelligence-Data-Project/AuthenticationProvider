@@ -68,7 +68,7 @@ public class AccountVerificationController : ControllerBase
 
             // Return success response
             _logger.LogInformation("Email verified successfully for company: {CompanyId}", company.Id);
-            return Ok("Din e-postadress har verifierats framgångsrikt.");
+            return Redirect("http://localhost:3000/verification-success");
         }
         catch (Exception ex)
         {
@@ -77,3 +77,5 @@ public class AccountVerificationController : ControllerBase
         }
     }
 }
+
+  
