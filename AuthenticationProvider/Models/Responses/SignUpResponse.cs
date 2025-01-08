@@ -6,4 +6,5 @@ public class SignUpResponse
     public string UserId { get; set; } = null!;
     public Guid CompanyId { get; set; }
     public string Token { get; set; } = null!;
+    public string? ErrorMessage { get; set; }
 }

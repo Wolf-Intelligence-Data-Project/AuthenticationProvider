@@ -25,7 +25,7 @@ public class CompanyEntity
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    public BusinessType BusinessType { get; set; }
+    public string BusinessType { get; set; }
 
     [Required]
     [StringLength(100)]

@@ -1,14 +1,10 @@
 ﻿using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Interfaces.Repositories;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Services.Tokens
 {
@@ -33,6 +29,7 @@ namespace AuthenticationProvider.Services.Tokens
 
         public async Task<string> CreateAccountVerificationTokenAsync(Guid companyId)
         {
+            // Check if the company exists
             var company = await _companyRepository.GetByIdAsync(companyId);
             if (company == null)
             {
@@ -46,10 +43,16 @@ namespace AuthenticationProvider.Services.Tokens
                 throw new ArgumentException("Company email is required to generate account verification token.");
             }
 
-            // Delete existing tokens for the company
-            await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
+            // Check for existing tokens for the company
+            var existingToken = await _accountVerificationTokenRepository.GetTokenByIdAsync(companyId);
+            if (existingToken != null)
+            {
+                // Revoke and delete the existing token
+                _logger.LogInformation("Existing token found for company {CompanyId}. Revoking and deleting the token.", companyId);
+                await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
+            }
 
-            // Generate a new token
+            // Generate a new JWT token
             var secretKey = _configuration["Jwt:Key"];
             var issuer = _configuration["Jwt:Issuer"];
 
@@ -62,15 +65,14 @@ namespace AuthenticationProvider.Services.Tokens
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var tokenHandler = new JwtSecurityTokenHandler();
-
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim(ClaimTypes.NameIdentifier, companyId.ToString()),  // companyId as NameIdentifier claim
-                    new Claim(ClaimTypes.Email, company.Email),                  // Email as Email claim
-                    new Claim("token_type", "AccountVerification")              // Custom claim for token type
-                }),
+            new Claim(ClaimTypes.NameIdentifier, companyId.ToString()), // companyId as NameIdentifier claim
+            new Claim(ClaimTypes.Email, company.Email),                 // Email as Email claim
+            new Claim("token_type", "AccountVerification")             // Custom claim for token type
+        }),
                 Expires = DateTime.UtcNow.AddHours(1),
                 Issuer = issuer,
                 SigningCredentials = credentials
@@ -79,7 +81,7 @@ namespace AuthenticationProvider.Services.Tokens
             var jwtToken = tokenHandler.CreateToken(tokenDescriptor);
             var tokenString = tokenHandler.WriteToken(jwtToken);
 
-            // Save the token in the database
+            // Save the new token in the database
             var accountVerificationToken = new AccountVerificationTokenEntity
             {
                 Token = tokenString,
@@ -89,10 +91,12 @@ namespace AuthenticationProvider.Services.Tokens
             };
 
             await _accountVerificationTokenRepository.CreateAsync(accountVerificationToken);
+
             _logger.LogInformation("Account verification token created for company: {CompanyId}", companyId);
 
             return tokenString;
         }
+
 
         public async Task<bool> ValidateAccountVerificationTokenAsync(string token)
         {

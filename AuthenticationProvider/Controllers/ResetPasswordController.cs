@@ -119,7 +119,7 @@ namespace AuthenticationProvider.Controllers
                 _logger.LogInformation("Valid token accessed: {Token} at {Timestamp}", token, DateTime.UtcNow);
 
                 // If the token is valid, redirect to the frontend page with the token
-                return Redirect($"http://localhost:3000/reset-password?token={token}");
+                return Redirect($"http://localhost:3004/reset-password?token={token}");
             }
             catch (Exception ex)
             {

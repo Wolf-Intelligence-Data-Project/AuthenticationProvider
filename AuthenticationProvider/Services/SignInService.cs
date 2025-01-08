@@ -55,6 +55,16 @@ namespace AuthenticationProvider.Services
                 IsVerified = companyEntity.IsVerified
             };
 
+            // First, check if the company is verified
+            if (!companyEntity.IsVerified)
+            {
+                return new SignInResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Företaget är inte verifierat." // "The company is not verified."
+                };
+            }
+
             // Validate the password by comparing the hashed version using PasswordHasher
             var passwordValid = _passwordHasher.VerifyHashedPassword(applicationUser, applicationUser.PasswordHash, signInDto.Password);
             if (passwordValid != PasswordVerificationResult.Success)
@@ -66,17 +76,7 @@ namespace AuthenticationProvider.Services
                 };
             }
 
-            // Check if the company is verified
-            if (!companyEntity.IsVerified)
-            {
-                return new SignInResponse
-                {
-                    Success = false,
-                    ErrorMessage = "Företaget är inte verifierat." // "The company is not verified."
-                };
-            }
-
-            // Generate the access token using the access token service (with ApplicationUser)
+            // If company is verified and password is correct, generate the token
             var token = _accessTokenService.GenerateAccessToken(applicationUser); // Pass ApplicationUser
 
             return new SignInResponse

@@ -104,35 +104,59 @@ namespace AuthenticationProvider.Services
 
         private async Task AddAddressesAsync(SignUpDto request, CompanyEntity company)
         {
+            _logger.LogInformation("Adding primary address for company {CompanyId}.", company.Id);
+
             // Add primary address
-            var primaryAddress = new AddressEntity
+            if (request.PrimaryAddress != null)
             {
-                StreetAddress = request.PrimaryAddress.StreetAddress,
-                City = request.PrimaryAddress.City,
-                PostalCode = request.PrimaryAddress.PostalCode,
-                CompanyId = company.Id,
-                AddressType = "Primary",
-                Region = request.PrimaryAddress.Region,
-                IsPrimary = true
-            };
-
-            await _addressRepository.AddAsync(primaryAddress);
-
-            // Add additional addresses
-            foreach (var additionalAddress in request.AdditionalAddresses)
-            {
-                var address = new AddressEntity
+                if (string.IsNullOrWhiteSpace(request.PrimaryAddress.StreetAddress) ||
+                    string.IsNullOrWhiteSpace(request.PrimaryAddress.City) ||
+                    string.IsNullOrWhiteSpace(request.PrimaryAddress.PostalCode))
                 {
-                    StreetAddress = additionalAddress.StreetAddress,
-                    City = additionalAddress.City,
-                    PostalCode = additionalAddress.PostalCode,
+                    throw new InvalidOperationException("Primary address is incomplete.");
+                }
+
+                var primaryAddress = new AddressEntity
+                {
+                    StreetAddress = request.PrimaryAddress.StreetAddress,
+                    City = request.PrimaryAddress.City,
+                    PostalCode = request.PrimaryAddress.PostalCode,
                     CompanyId = company.Id,
-                    AddressType = "Additional",
-                    Region = additionalAddress.Region,
-                    IsPrimary = false
+                    AddressType = "Primary",
+                    Region = request.PrimaryAddress.Region,
+                    IsPrimary = true
                 };
 
-                await _addressRepository.AddAsync(address);
+                await _addressRepository.AddAsync(primaryAddress);
+                _logger.LogInformation("Primary address added for company {CompanyId}.", company.Id);
+            }
+
+            // Add additional addresses
+            if (request.AdditionalAddresses != null)
+            {
+                foreach (var additionalAddress in request.AdditionalAddresses)
+                {
+                    if (string.IsNullOrWhiteSpace(additionalAddress.StreetAddress) ||
+                        string.IsNullOrWhiteSpace(additionalAddress.City) ||
+                        string.IsNullOrWhiteSpace(additionalAddress.PostalCode))
+                    {
+                        throw new InvalidOperationException("Additional address is incomplete.");
+                    }
+
+                    var address = new AddressEntity
+                    {
+                        StreetAddress = additionalAddress.StreetAddress,
+                        City = additionalAddress.City,
+                        PostalCode = additionalAddress.PostalCode,
+                        CompanyId = company.Id,
+                        AddressType = "Additional",
+                        Region = additionalAddress.Region,
+                        IsPrimary = false
+                    };
+
+                    await _addressRepository.AddAsync(address);
+                    _logger.LogInformation("Additional address added for company {CompanyId}.", company.Id);
+                }
             }
         }
 

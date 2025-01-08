@@ -17,6 +17,5 @@ public class AddressDto
     public string City { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Region är obligatorisk.")]
-    [EnumDataType(typeof(Region), ErrorMessage = "Välj en giltig region.")]
-    public Region Region { get; set; } // Region is required in AddressDto
+    public string Region { get; set; } = string.Empty;
 }

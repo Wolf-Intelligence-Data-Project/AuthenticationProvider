@@ -25,7 +25,11 @@ public class SignUpController : ControllerBase
     public async Task<IActionResult> Register([FromBody] SignUpDto request)
     {
         _logger.LogInformation("Register endpoint called.");
-
+        if (!ModelState.IsValid)
+        {
+            _logger.LogWarning("Model validation failed: {Errors}", string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            return BadRequest(ModelState);
+        }
         if (!ModelState.IsValid)
         {
             _logger.LogWarning("Model validation failed.");

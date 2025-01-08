@@ -18,7 +18,7 @@ namespace AuthenticationProvider.Data.Entities
         public string City { get; set; } = string.Empty;
 
         [Required]
-        public Region Region { get; set; }
+        public string Region { get; set; } = string.Empty;
 
         [Required]
         public Guid CompanyId { get; set; }
