@@ -1,193 +1,191 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 namespace AuthenticationProvider.Models;
-
 public enum BusinessType
 {
     [Display(Name = "Detaljhandel")]
-    Retail = 1,
+    Retail,
 
     [Display(Name = "Tjänsteföretag")]
-    Service = 2,
+    Service,
 
     [Display(Name = "Tillverkning")]
-    Manufacturing = 3,
+    Manufacturing,
 
     [Display(Name = "IT")]
-    IT = 4,
+    IT,
 
     [Display(Name = "Vård och Hälsa")]
-    Healthcare = 5,
+    Healthcare,
 
     [Display(Name = "Byggsektor")]
-    Construction = 6,
+    Construction,
 
     [Display(Name = "Finans")]
-    Finance = 7,
+    Finance,
 
     [Display(Name = "Fastigheter")]
-    RealEstate = 8,
+    RealEstate,
 
     [Display(Name = "Transport")]
-    Transportation = 9,
+    Transportation,
 
     [Display(Name = "Jordbruk")]
-    Agriculture = 10,
+    Agriculture,
 
     [Display(Name = "Utbildning")]
-    Education = 11,
+    Education,
 
     [Display(Name = "Hotell och Restaurang")]
-    Hospitality = 12,
+    Hospitality,
 
     [Display(Name = "Turism")]
-    Tourism = 13,
+    Tourism,
 
     [Display(Name = "Underhållning")]
-    Entertainment = 14,
+    Entertainment,
 
     [Display(Name = "Media")]
-    Media = 15,
+    Media,
 
     [Display(Name = "Telekommunikation")]
-    Telecommunications = 16,
+    Telecommunications,
 
     [Display(Name = "Energi")]
-    Energy = 17,
+    Energy,
 
     [Display(Name = "Logistik")]
-    Logistics = 18,
+    Logistics,
 
     [Display(Name = "Juridik")]
-    Legal = 19,
+    Legal,
 
     [Display(Name = "Konsulttjänster")]
-    Consulting = 20,
+    Consulting,
 
     [Display(Name = "Marknadsföring")]
-    Marketing = 21,
+    Marketing,
 
     [Display(Name = "Reklam")]
-    Advertising = 22,
+    Advertising,
 
     [Display(Name = "Livsmedel och Dryck")]
-    FoodAndBeverage = 23,
+    FoodAndBeverage,
 
     [Display(Name = "Bilindustrin")]
-    Automotive = 24,
+    Automotive,
 
     [Display(Name = "Farmaceutiska produkter")]
-    Pharmaceuticals = 25,
+    Pharmaceuticals,
 
     [Display(Name = "Engros")]
-    Wholesale = 26,
+    Wholesale,
 
     [Display(Name = "Teknologi")]
-    Technology = 27,
+    Technology,
 
     [Display(Name = "Programutveckling")]
-    SoftwareDevelopment = 28,
+    SoftwareDevelopment,
 
     [Display(Name = "E-handel")]
-    ECommerce = 29,
+    ECommerce,
 
     [Display(Name = "Icke-vinstdrivande")]
-    NonProfit = 30,
+    NonProfit,
 
     [Display(Name = "Försäkringar")]
-    Insurance = 31,
+    Insurance,
 
     [Display(Name = "Publicering")]
-    Publishing = 32,
+    Publishing,
 
     [Display(Name = "Luftfart")]
-    Aerospace = 33,
+    Aerospace,
 
     [Display(Name = "Gruvdrift")]
-    Mining = 34,
+    Mining,
 
     [Display(Name = "Textilier")]
-    Textiles = 35,
+    Textiles,
 
     [Display(Name = "Mode")]
-    Fashion = 36,
+    Fashion,
 
     [Display(Name = "Bioteknik")]
-    Biotechnology = 37,
+    Biotechnology,
 
     [Display(Name = "Arkitektur")]
-    Architecture = 38,
+    Architecture,
 
     [Display(Name = "Miljö- och hållbarhetstjänster")]
-    EnvironmentalServices = 39,
+    EnvironmentalServices,
 
     [Display(Name = "Regering")]
-    Government = 40,
+    Government,
 
     [Display(Name = "Forskning och Utveckling")]
-    ResearchAndDevelopment = 41,
+    ResearchAndDevelopment,
 
     [Display(Name = "Säkerhet")]
-    Security = 42,
+    Security,
 
     [Display(Name = "Eventhantering")]
-    EventManagement = 43,
+    EventManagement,
 
     [Display(Name = "Sport och Fitness")]
-    SportsAndFitness = 44,
+    SportsAndFitness,
 
     [Display(Name = "Konst och Kultur")]
-    ArtsAndCulture = 45,
+    ArtsAndCulture,
 
     [Display(Name = "Redovisning")]
-    Accounting = 46,
+    Accounting,
 
     [Display(Name = "Human Resources")]
-    HumanResources = 47,
+    HumanResources,
 
     [Display(Name = "Supply Chain")]
-    SupplyChain = 48,
+    SupplyChain,
 
     [Display(Name = "Elektronik")]
-    Electronics = 49,
+    Electronics,
 
     [Display(Name = "Medicinteknik")]
-    MedicalDevices = 50,
+    MedicalDevices,
 
     [Display(Name = "Städtjänster")]
-    CleaningServices = 51,
+    CleaningServices,
 
     [Display(Name = "Import och Export")]
-    ImportExport = 52,
+    ImportExport,
 
     [Display(Name = "Byggutrustning")]
-    ConstructionEquipment = 53,
+    ConstructionEquipment,
 
     [Display(Name = "Hemförbättring")]
-    HomeImprovement = 54,
+    HomeImprovement,
 
     [Display(Name = "Apputveckling")]
-    AppDevelopment = 55,
+    AppDevelopment,
 
     [Display(Name = "Design")]
-    Design = 56,
+    Design,
 
     [Display(Name = "Fotografi")]
-    Photography = 57,
+    Photography,
 
     [Display(Name = "Landskapsvård")]
-    Landscaping = 58,
+    Landscaping,
 
     [Display(Name = "Fastighetsförvaltning")]
-    PropertyManagement = 59,
+    PropertyManagement,
 
     [Display(Name = "Digital Marknadsföring")]
-    DigitalMarketing = 60,
+    DigitalMarketing,
 
     [Display(Name = "Retail Tech")]
-    RetailTech = 61,
+    RetailTech,
 
     [Display(Name = "Hälsa och Välmående")]
-    HealthAndWellness = 62
+    HealthAndWellness
 }
-

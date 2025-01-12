@@ -20,8 +20,7 @@ public class SignUpDto
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    [EnumDataType(typeof(BusinessType), ErrorMessage = "Ogiltig företagstyp.")]
-    public BusinessType BusinessType { get; set; }
+    public string BusinessType { get; set; }
 
     [Required]
     [StringLength(100, ErrorMessage = "Ansvarig persons namn får inte överstiga 100 tecken.")]

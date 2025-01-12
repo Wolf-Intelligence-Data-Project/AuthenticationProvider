@@ -12,15 +12,14 @@ namespace AuthenticationProvider.Controllers
     {
         // GET: api/businessType
         [HttpGet]
-        [HttpGet]
         public IActionResult GetBusinessTypes()
         {
             var businessTypes = Enum.GetValues(typeof(BusinessType))
                 .Cast<BusinessType>()
                 .Select(e => new
                 {
-                    Value = e.ToString(),  // Use enum name as string
-                    DisplayName = GetEnumDisplayName(e)
+                    Value = (int)e,  // Enum value as an integer
+                    DisplayName = GetEnumDisplayName(e)  // DisplayName from the DisplayAttribute
                 })
                 .ToList();
 

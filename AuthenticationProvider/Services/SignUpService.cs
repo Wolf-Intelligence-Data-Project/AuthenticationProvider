@@ -187,11 +187,12 @@ namespace AuthenticationProvider.Services
                 throw new InvalidOperationException("Lösenorden matchar inte.");
             }
 
-            // Business Type validation
-            if (!Enum.IsDefined(typeof(BusinessType), request.BusinessType))
+            // Validate BusinessType string against the enum
+            if (string.IsNullOrWhiteSpace(request.BusinessType))
             {
                 throw new InvalidOperationException("Ogiltig företagstyp.");
             }
+
 
             // Responsible person's name
             if (request.ResponsiblePersonName.Length > 100)

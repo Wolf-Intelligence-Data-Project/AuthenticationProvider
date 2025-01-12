@@ -72,7 +72,7 @@ public class AccountVerificationController : ControllerBase
 
             // Return success response
             _logger.LogInformation("Email verified successfully for company: {CompanyId}", company.Id);
-            return Redirect("http://localhost:3004/verification-success");
+            return Redirect("http://localhost:3000/verification-success");
         }
         catch (Exception ex)
         {
