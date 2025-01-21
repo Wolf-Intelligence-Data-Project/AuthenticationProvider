@@ -2,7 +2,7 @@
 
 namespace AuthenticationProvider.Models;
 
-public enum Region
+public enum RegionEnum
 {
     [Display(Name = "Stockholm")]
     Stockholm = 1,

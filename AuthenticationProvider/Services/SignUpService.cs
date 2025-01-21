@@ -1,5 +1,4 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Text.RegularExpressions;
@@ -10,6 +9,7 @@ using AuthenticationProvider.Data.Dtos;
 using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 
 namespace AuthenticationProvider.Services
 {
@@ -104,7 +104,10 @@ namespace AuthenticationProvider.Services
 
         private async Task AddAddressesAsync(SignUpDto request, CompanyEntity company)
         {
-            _logger.LogInformation("Adding primary address for company {CompanyId}.", company.Id);
+            _logger.LogInformation("Adding addresses for company {CompanyId}.", company.Id);
+
+            // Retrieve all existing addresses associated with the company once
+            var existingAddresses = await _addressRepository.GetAddressesByCompanyIdAsync(company.Id);
 
             // Add primary address
             if (request.PrimaryAddress != null)
@@ -116,13 +119,20 @@ namespace AuthenticationProvider.Services
                     throw new InvalidOperationException("Primary address is incomplete.");
                 }
 
+                // Check if the primary address already exists for the company
+                if (existingAddresses.Any(a => a.StreetAddress == request.PrimaryAddress.StreetAddress &&
+                                               a.City == request.PrimaryAddress.City &&
+                                               a.PostalCode == request.PrimaryAddress.PostalCode))
+                {
+                    throw new InvalidOperationException("Den här adressen finns redan för företaget.");
+                }
+
                 var primaryAddress = new AddressEntity
                 {
                     StreetAddress = request.PrimaryAddress.StreetAddress,
                     City = request.PrimaryAddress.City,
                     PostalCode = request.PrimaryAddress.PostalCode,
                     CompanyId = company.Id,
-                    AddressType = "Primary",
                     Region = request.PrimaryAddress.Region,
                     IsPrimary = true
                 };
@@ -143,13 +153,20 @@ namespace AuthenticationProvider.Services
                         throw new InvalidOperationException("Additional address is incomplete.");
                     }
 
+                    // Check if the additional address already exists for the company
+                    if (existingAddresses.Any(a => a.StreetAddress == additionalAddress.StreetAddress &&
+                                                   a.City == additionalAddress.City &&
+                                                   a.PostalCode == additionalAddress.PostalCode))
+                    {
+                        throw new InvalidOperationException("Den här adressen finns redan för företaget.");
+                    }
+
                     var address = new AddressEntity
                     {
                         StreetAddress = additionalAddress.StreetAddress,
                         City = additionalAddress.City,
                         PostalCode = additionalAddress.PostalCode,
                         CompanyId = company.Id,
-                        AddressType = "Additional",
                         Region = additionalAddress.Region,
                         IsPrimary = false
                     };

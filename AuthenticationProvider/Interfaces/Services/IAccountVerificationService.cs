@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Models.Tokens;
+﻿using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Services;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Services;
 
 public interface IAccountVerificationService
 {

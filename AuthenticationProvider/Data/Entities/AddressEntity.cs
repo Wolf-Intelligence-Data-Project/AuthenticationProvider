@@ -24,11 +24,6 @@ namespace AuthenticationProvider.Data.Entities
         public Guid CompanyId { get; set; }
 
         public CompanyEntity? Company { get; set; }
-
-        [Required]
-        public string AddressType { get; set; }
-
-        // Add validation logic to make it optional for non-primary addresses
         public bool IsPrimary { get; set; }
     }
 }

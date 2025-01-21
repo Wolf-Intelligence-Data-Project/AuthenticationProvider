@@ -1,7 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 namespace AuthenticationProvider.Models;
-public enum BusinessType
+
+// This enum is fetched for dropdown menu in frontend
+public enum BusinessTypeEnum
 {
     [Display(Name = "Detaljhandel")]
     Retail,

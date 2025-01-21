@@ -1,4 +1,4 @@
-﻿namespace AuthenticationProvider.Models.Tokens;
+﻿namespace AuthenticationProvider.Models.Responses;
 
 public enum VerificationResult
 {

@@ -1,167 +1,227 @@
 ﻿using AuthenticationProvider.Data.Entities;
-using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace AuthenticationProvider.Services.Tokens
-{
-    public class AccountVerificationTokenService : IAccountVerificationTokenService
-    {
-        private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
-        private readonly ICompanyRepository _companyRepository;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<AccountVerificationTokenService> _logger;
+namespace AuthenticationProvider.Services.Tokens;
 
-        public AccountVerificationTokenService(
-            IAccountVerificationTokenRepository accountVerificationTokenRepository,
-            ICompanyRepository companyRepository,
-            IConfiguration configuration,
-            ILogger<AccountVerificationTokenService> logger)
+public class AccountVerificationTokenService : IAccountVerificationTokenService
+{
+    private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
+    private readonly ICompanyRepository _companyRepository;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<AccountVerificationTokenService> _logger;
+
+    public AccountVerificationTokenService(
+        IAccountVerificationTokenRepository accountVerificationTokenRepository,
+        ICompanyRepository companyRepository,
+        IConfiguration configuration,
+        ILogger<AccountVerificationTokenService> logger)
+    {
+        _accountVerificationTokenRepository = accountVerificationTokenRepository;
+        _companyRepository = companyRepository;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    public async Task<string> CreateAccountVerificationTokenAsync(Guid companyId)
+    {
+
+        // Check if the company exists
+        var company = await _companyRepository.GetByIdAsync(companyId);
+        if (company == null)
         {
-            _accountVerificationTokenRepository = accountVerificationTokenRepository;
-            _companyRepository = companyRepository;
-            _configuration = configuration;
-            _logger = logger;
+            _logger.LogWarning("Company not found: {CompanyId}", companyId);
+            throw new ArgumentException("Invalid company ID.");
         }
 
-        public async Task<string> CreateAccountVerificationTokenAsync(Guid companyId)
+        // Check if the company is already verified
+        if (company.IsVerified)
         {
-            // Check if the company exists
-            var company = await _companyRepository.GetByIdAsync(companyId);
-            if (company == null)
-            {
-                _logger.LogWarning("Company not found: {CompanyId}", companyId);
-                throw new ArgumentException("Invalid company ID.");
-            }
+            _logger.LogWarning("Account already verified for company: {CompanyId}", companyId);
+            throw new InvalidOperationException("The company account is already verified. No further verification tokens can be generated.");
+        }
 
-            if (string.IsNullOrEmpty(company.Email))
-            {
-                _logger.LogWarning("Company email is null or empty: {CompanyId}", companyId);
-                throw new ArgumentException("Company email is required to generate account verification token.");
-            }
 
-            // Check for existing tokens for the company
-            var existingToken = await _accountVerificationTokenRepository.GetTokenByIdAsync(companyId);
-            if (existingToken != null)
-            {
-                // Revoke and delete the existing token
-                _logger.LogInformation("Existing token found for company {CompanyId}. Revoking and deleting the token.", companyId);
-                await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
-            }
+        if (string.IsNullOrEmpty(company.Email))
+        {
+            _logger.LogWarning("Company email is null or empty: {CompanyId}", companyId);
+            throw new ArgumentException("Company email is required to generate account verification token.");
+        }
 
-            // Generate a new JWT token
+        // Check for existing tokens for the company
+        var existingToken = await _accountVerificationTokenRepository.GetTokenByIdAsync(companyId);
+        if (existingToken != null)
+        {
+            // Revoke and delete the existing token
+            _logger.LogInformation("Existing token found for company {CompanyId}. Revoking and deleting the token.", companyId);
+            await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
+        }
+
+        // Generate a new JWT token
+        var secretKey = _configuration["Jwt:Key"];
+        var issuer = _configuration["Jwt:Issuer"];
+        var audience = _configuration["Jwt:Audience"]; // Add the audience from configuration
+
+        if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
+        {
+            throw new ArgumentNullException("JWT settings are missing in the configuration.");
+        }
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[] {
+            new Claim(ClaimTypes.NameIdentifier, companyId.ToString()),
+            new Claim(ClaimTypes.Email, company.Email),                
+            new Claim("token_type", "AccountVerification"),          
+        }),
+            Expires = DateTime.UtcNow.AddHours(1),
+            Issuer = issuer,
+            Audience = audience, 
+            SigningCredentials = credentials
+        };
+
+        var jwtToken = tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = tokenHandler.WriteToken(jwtToken);
+
+        // Save the new token in the database
+        var accountVerificationToken = new AccountVerificationTokenEntity
+        {
+            Token = tokenString,
+            CompanyId = companyId,
+            ExpiryDate = DateTime.UtcNow.AddHours(1),
+            IsUsed = false
+        };
+
+        await _accountVerificationTokenRepository.CreateAsync(accountVerificationToken);
+
+        _logger.LogInformation("Account verification token created for company: {CompanyId}", companyId);
+
+        return tokenString;
+    }
+
+
+
+    public async Task<ClaimsPrincipal> ValidateAccountVerificationTokenAsync(string token)
+    {
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new ArgumentNullException("Token is required for validation.");
+        }
+
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
             var secretKey = _configuration["Jwt:Key"];
             var issuer = _configuration["Jwt:Issuer"];
+            var audience = _configuration["Jwt:Audience"];
 
-            if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
+            if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
             {
                 throw new ArgumentNullException("JWT settings are missing in the configuration.");
             }
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var tokenDescriptor = new SecurityTokenDescriptor
+            var validationParameters = new TokenValidationParameters
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-            new Claim(ClaimTypes.NameIdentifier, companyId.ToString()), // companyId as NameIdentifier claim
-            new Claim(ClaimTypes.Email, company.Email),                 // Email as Email claim
-            new Claim("token_type", "AccountVerification")             // Custom claim for token type
-        }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                Issuer = issuer,
-                SigningCredentials = credentials
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,  // Ensures token is not expired
+                ValidIssuer = issuer,
+                ValidAudience = audience,
+                IssuerSigningKey = securityKey,  // Ensures the token is signed with the correct key
+                ClockSkew = TimeSpan.Zero // Optional: to avoid a small clock skew
             };
 
-            var jwtToken = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(jwtToken);
+            // Validate the token and extract claims
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
-            // Save the new token in the database
-            var accountVerificationToken = new AccountVerificationTokenEntity
+            // Check if token type is correct for account verification
+            var jwtToken = validatedToken as JwtSecurityToken;
+            var tokenTypeClaim = jwtToken?.Claims.FirstOrDefault(c => c.Type == "token_type")?.Value;
+
+            if (tokenTypeClaim != "AccountVerification")
             {
-                Token = tokenString,
-                CompanyId = companyId,
-                ExpiryDate = DateTime.UtcNow.AddHours(1),
-                IsUsed = false
-            };
+                throw new SecurityTokenException("Invalid token type.");
+            }
 
-            await _accountVerificationTokenRepository.CreateAsync(accountVerificationToken);
-
-            _logger.LogInformation("Account verification token created for company: {CompanyId}", companyId);
-
-            return tokenString;
+            return principal;
         }
-
-
-        public async Task<bool> ValidateAccountVerificationTokenAsync(string token)
+        catch (SecurityTokenExpiredException)
         {
-            var storedToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
-            if (storedToken == null || storedToken.IsUsed)
-            {
-                _logger.LogWarning("Invalid or expired account verification token: {Token}", token);
-                return false;
-            }
-
-            _logger.LogInformation("Valid account verification token found: {Token}", token);
-            return true;
+            _logger.LogWarning("Account verification token has expired.");
+            throw new UnauthorizedAccessException("Token has expired.");
         }
-
-        public async Task MarkAccountVerificationTokenAsUsedAsync(string token)
+        catch (SecurityTokenException ex)
         {
-            var storedToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
-            if (storedToken != null)
-            {
-                storedToken.IsUsed = true;
-                await _accountVerificationTokenRepository.MarkAsUsedAsync(storedToken.Id);
-                _logger.LogInformation("Account verification token marked as used: {TokenId}", storedToken.Id);
-            }
-            else
-            {
-                _logger.LogWarning("Attempted to mark a non-existent token as used: {Token}", token);
-            }
+            _logger.LogError("Invalid token: {Message}", ex.Message);
+            throw new UnauthorizedAccessException("Invalid token.");
         }
-
-        public async Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token)
+        catch (Exception ex)
         {
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                _logger.LogWarning("The provided token is invalid or empty.");
-                return null;
-            }
-
-            var accountVerificationToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
-
-            if (accountVerificationToken == null)
-            {
-                _logger.LogWarning("The provided account verification token does not exist.");
-                return null;
-            }
-
-            if (accountVerificationToken.ExpiryDate < DateTime.UtcNow)
-            {
-                _logger.LogWarning($"The account verification token has expired. Token: {token}");
-                return null;
-            }
-
-            if (accountVerificationToken.IsUsed)
-            {
-                _logger.LogWarning($"The account verification token has already been used. Token: {token}");
-                return null;
-            }
-
-            return accountVerificationToken;
+            _logger.LogError("An error occurred while validating token: {Message}", ex.Message);
+            throw new UnauthorizedAccessException("Token validation failed.");
         }
+    }
 
-        public async Task DeleteAccountVerificationTokensForCompanyAsync(Guid companyId)
+
+    public async Task MarkAccountVerificationTokenAsUsedAsync(string token)
+    {
+        var storedToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
+        if (storedToken != null)
         {
-            // Calling the new RevokeAndDeleteAsync method from the repository
-            await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
-            _logger.LogInformation("All account verification tokens for company {CompanyId} have been revoked and deleted.", companyId);
+            storedToken.IsUsed = true;
+            await _accountVerificationTokenRepository.MarkAsUsedAsync(storedToken.Id);
+            _logger.LogInformation("Account verification token marked as used: {TokenId}", storedToken.Id);
         }
+        else
+        {
+            _logger.LogWarning("Attempted to mark a non-existent token as used: {Token}", token);
+        }
+    }
+
+    public async Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _logger.LogWarning("The provided token is invalid or empty.");
+            return null;
+        }
+
+        var accountVerificationToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
+
+        if (accountVerificationToken == null)
+        {
+            _logger.LogWarning("The provided account verification token does not exist.");
+            return null;
+        }
+
+        if (accountVerificationToken.ExpiryDate < DateTime.UtcNow)
+        {
+            _logger.LogWarning($"The account verification token has expired. Token: {token}");
+            return null;
+        }
+
+        if (accountVerificationToken.IsUsed)
+        {
+            _logger.LogWarning($"The account verification token has already been used. Token: {token}");
+            return null;
+        }
+
+        return accountVerificationToken;
+    }
+
+    public async Task DeleteAccountVerificationTokensForCompanyAsync(Guid companyId)
+    {
+        // Calling the new RevokeAndDeleteAsync method from the repository
+        await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
+        _logger.LogInformation("All account verification tokens for company {CompanyId} have been revoked and deleted.", companyId);
     }
 }

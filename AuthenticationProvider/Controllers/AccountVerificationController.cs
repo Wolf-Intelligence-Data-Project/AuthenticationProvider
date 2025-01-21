@@ -1,7 +1,8 @@
-﻿using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Models.Tokens; // Assuming you have the Company entity
+﻿using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Models;
 using AuthenticationProvider.Services.Clients;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
@@ -9,7 +10,6 @@ using System.ComponentModel.Design;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Controllers;
-
 [ApiController]
 [Route("api/[controller]")]
 public class AccountVerificationController : ControllerBase
@@ -37,7 +37,7 @@ public class AccountVerificationController : ControllerBase
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("No token provided for email verification.");
-            return BadRequest("Token krävs.");
+            return BadRequest("Något gick fel.");
         }
 
         try
@@ -47,7 +47,7 @@ public class AccountVerificationController : ControllerBase
             if (accountVerificationToken == null)
             {
                 _logger.LogWarning("Invalid or expired token provided for email verification.");
-                return BadRequest("Ogiltigt eller utgånget token.");
+                return BadRequest("Ogiltigt session.");
             }
 
             // Fetch the company related to this token
@@ -55,8 +55,10 @@ public class AccountVerificationController : ControllerBase
             if (company == null)
             {
                 _logger.LogWarning("No company found associated with the token.");
-                return BadRequest("Företaget kunde inte hittas.");
+                return BadRequest("Kontot kunde inte hittas.");
             }
+
+           
 
             // Mark token as used
             await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(token);
@@ -81,10 +83,11 @@ public class AccountVerificationController : ControllerBase
         }
     }
 
+
     [HttpPost("resend-verification-email")]
-    public async Task<IActionResult> ResendVerificationEmail([FromBody] EmailRequest emailRequest)
+    public async Task<IActionResult> ResendVerificationEmail([FromBody] EmailDto emailDto)
     {
-        if (string.IsNullOrEmpty(emailRequest.Email))
+        if (string.IsNullOrEmpty(emailDto.Email))
         {
             _logger.LogWarning("No email provided for resending verification email.");
             return BadRequest(new { message = "Email is required." });
@@ -93,10 +96,10 @@ public class AccountVerificationController : ControllerBase
         try
         {
             // Fetch the company by email
-            var company = await _companyRepository.GetByEmailAsync(emailRequest.Email);
+            var company = await _companyRepository.GetByEmailAsync(emailDto.Email);
             if (company == null)
             {
-                _logger.LogWarning("Company not found with email: {Email}", emailRequest.Email);
+                _logger.LogWarning("Company not found with email: {Email}", emailDto.Email);
                 return BadRequest(new { message = "Company not found." });
             }
 
@@ -111,22 +114,19 @@ public class AccountVerificationController : ControllerBase
                 return StatusCode(500, new { message = "Failed to send verification email." });
             }
 
-            _logger.LogInformation("Verification email resent to company with email: {Email}", emailRequest.Email);
+            _logger.LogInformation("Verification email resent to company with email: {Email}", emailDto.Email);
 
             // Return success response
             return Ok(new { message = "Verification email resent." });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while resending the verification email for email: {Email}", emailRequest.Email);
+            _logger.LogError(ex, "An error occurred while resending the verification email for email: {Email}", emailDto.Email);
             return StatusCode(500, new { message = "An error occurred while resending the verification email." });
         }
     }
 
-    public class EmailRequest
-    {
-        public string Email { get; set; }
-    }
+
 
 
 }

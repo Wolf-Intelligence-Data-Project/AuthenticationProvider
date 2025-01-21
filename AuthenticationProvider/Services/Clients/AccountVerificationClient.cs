@@ -1,27 +1,72 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
-using System.Net.Http;
+using AuthenticationProvider.Interfaces;
 
 namespace AuthenticationProvider.Services.Clients;
 
-public class AccountVerificationClient(HttpClient httpClient)
+public class AccountVerificationClient : IAccountVerificationClient
 {
-    private readonly HttpClient _httpClient = httpClient;
+    private readonly HttpClient _httpClient;
+    private readonly string _accountVerificationEndpoint;
+    private readonly ILogger<AccountVerificationClient> _logger;
 
+    // Constructor to inject HttpClient, configuration, and logger
+    public AccountVerificationClient(HttpClient httpClient, IConfiguration configuration, ILogger<AccountVerificationClient> logger)
+    {
+        _httpClient = httpClient;
+        _accountVerificationEndpoint = configuration["AccountVerificationProvider:Endpoint"]
+            ?? throw new ArgumentNullException("Endpoint is not configured.");
+
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Sends an account verification request (token) to the Email Provider that creates and sends the email
+    /// </summary>
+    /// <param name="token">The verification token to send in the email.</param>
+    /// <returns>True if the email was sent successfully; otherwise, false.</returns>
     public async Task<bool> SendVerificationEmailAsync(string token)
     {
-        // Create the request payload with only the Token (no email)
-        var requestPayload = new
+        if (string.IsNullOrWhiteSpace(token))
         {
-            Token = token
-        };
+            _logger.LogWarning("Provided token is null or empty.");
+            return false;
+        }
 
-        var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
+        try
+        {
+            _logger.LogInformation("Preparing to send verification email.");
 
-        // Send POST request to the EmailVerificationProvider endpoint
-        var response = await _httpClient.PostAsync("http://localhost:7092/api/SendVerificationEmail", content);
+            // Create the request payload which contains the token (no email needed)
+            var requestPayload = new { Token = token };
+            var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
 
-        // Return true if the response is successful
-        return response.IsSuccessStatusCode;
+            _logger.LogInformation("Sending request to AccountVerificationProvider endpoint: {Endpoint}", _accountVerificationEndpoint);
+
+            var response = await _httpClient.PostAsync(_accountVerificationEndpoint, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Account verification email sent successfully.");
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning("Failed to send account verification email. Status code: {StatusCode}", response.StatusCode);
+                return false;
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "An error occurred while sending the account verification email.");
+            Console.WriteLine("Ett problem uppstod vid sändning av verifieringsmejlet.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An unexpected error occurred.");
+            Console.WriteLine("Ett oväntat fel inträffade.");
+            return false;
+        }
     }
 }

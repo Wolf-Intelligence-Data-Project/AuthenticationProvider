@@ -4,6 +4,7 @@ using AuthenticationProvider.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AuthenticationProvider.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250121173702_removing addresstype from table")]
+    partial class removingaddresstypefromtable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,9 +148,7 @@ namespace AuthenticationProvider.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsPrimary")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
+                        .HasColumnType("bit");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
@@ -218,7 +219,9 @@ namespace AuthenticationProvider.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PrimaryAddressId");
+                    b.HasIndex("PrimaryAddressId")
+                        .IsUnique()
+                        .HasFilter("[PrimaryAddressId] IS NOT NULL");
 
                     b.ToTable("Companies");
                 });
@@ -409,8 +412,9 @@ namespace AuthenticationProvider.Migrations
             modelBuilder.Entity("AuthenticationProvider.Data.Entities.CompanyEntity", b =>
                 {
                     b.HasOne("AuthenticationProvider.Data.Entities.AddressEntity", "PrimaryAddress")
-                        .WithMany()
-                        .HasForeignKey("PrimaryAddressId");
+                        .WithOne()
+                        .HasForeignKey("AuthenticationProvider.Data.Entities.CompanyEntity", "PrimaryAddressId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("PrimaryAddress");
                 });

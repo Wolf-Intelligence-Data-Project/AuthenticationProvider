@@ -40,9 +40,6 @@ public class CompanyEntity
     [Required]
     public bool TermsAndConditions { get; set; }
 
-    // Linking Primary Address
-    public int? PrimaryAddressId { get; set; } // Optional
-
     [ForeignKey("PrimaryAddressId")]
     public AddressEntity? PrimaryAddress { get; set; } // Optional
 

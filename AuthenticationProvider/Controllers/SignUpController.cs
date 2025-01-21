@@ -1,8 +1,9 @@
 ﻿using AuthenticationProvider.Data.Dtos;
-using AuthenticationProvider.Interfaces;
+using AuthenticationProvider.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Controllers;
@@ -12,28 +13,31 @@ namespace AuthenticationProvider.Controllers;
 public class SignUpController : ControllerBase
 {
     private readonly ISignUpService _signUpService;
+    private readonly ISignOutService _signOutService; // Inject SignOutService
     private readonly ILogger<SignUpController> _logger;
 
-    public SignUpController(ISignUpService signUpService, ILogger<SignUpController> logger)
+    public SignUpController(ISignUpService signUpService, ISignOutService signOutService, ILogger<SignUpController> logger)
     {
-        _signUpService = signUpService;
-        _logger = logger;
+        _signUpService = signUpService ?? throw new ArgumentNullException(nameof(signUpService));
+        _signOutService = signOutService ?? throw new ArgumentNullException(nameof(signOutService)); // Initialize SignOutService
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    // POST: /api/SignUp/register
+    /// <summary>
+    /// Register a new company. This endpoint takes company details and registers it.
+    /// </summary>
+    /// <param name="request">The sign-up details for the company.</param>
+    /// <returns>Returns the result of the registration, including the company ID and a verification token.</returns>
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] SignUpDto request)
     {
-        _logger.LogInformation("Register endpoint called.");
-        if (!ModelState.IsValid)
+        _logger.LogInformation("Register endpoint called with company data.");
+
+        if (!ModelState.IsValid) // Validate input model
         {
-            _logger.LogWarning("Model validation failed: {Errors}", string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-            return BadRequest(ModelState);
-        }
-        if (!ModelState.IsValid)
-        {
-            _logger.LogWarning("Model validation failed.");
-            return BadRequest(ModelState);  // Return validation errors
+            var validationErrors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            _logger.LogWarning("Model validation failed: {ValidationErrors}", validationErrors);
+            return BadRequest(new { message = "Ogiltig indata", errors = validationErrors });
         }
 
         try
@@ -45,24 +49,28 @@ public class SignUpController : ControllerBase
 
             return Ok(new
             {
-                message = "Company registered successfully!",
-                companyId = signUpResponse.CompanyId,  // Returning the Company ID as well
-                token = signUpResponse.Token  // Returning the verification token
+                message = "Företaget registrerat framgångsrikt!",
+                companyId = signUpResponse.CompanyId,
+                token = signUpResponse.Token // Returning the company verification token
             });
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogError("Validation failed during registration: {ErrorMessage}", ex.Message);
-            return BadRequest(new { message = ex.Message });  // Handle validation-specific errors
+            return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError("Unexpected error during registration: {ErrorMessage}", ex.Message);
-            return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+            _logger.LogError(ex, "Unexpected error during registration.");
+            return StatusCode(500, new { message = "Ett oväntat fel inträffade.", details = ex.Message });
         }
     }
 
-    // DELETE: /api/SignUp/delete/{companyId}
+    /// <summary>
+    /// Deletes a company based on the provided company ID.
+    /// </summary>
+    /// <param name="companyId">The unique identifier of the company to delete.</param>
+    /// <returns>Returns the result of the deletion, including success or failure message.</returns>
     [HttpDelete("delete/{companyId}")]
     public async Task<IActionResult> DeleteCompany(Guid companyId)
     {
@@ -70,25 +78,30 @@ public class SignUpController : ControllerBase
 
         try
         {
-            // Delegate delete logic to the SignUpService
+            // Sign out the company (invalidate the session)
+            var signOutResult = await _signOutService.SignOutAsync(companyId.ToString()); // Assuming the token is based on company ID or similar identifier
+            if (!signOutResult)
+            {
+                _logger.LogWarning("Failed to sign out the company with ID {CompanyId} before deletion.", companyId);
+            }
+
+            // Delegate the actual delete logic to the SignUpService
             await _signUpService.DeleteCompanyAsync(companyId);
 
             _logger.LogInformation("Company with ID {CompanyId} deleted successfully.", companyId);
 
-            return Ok(new
-            {
-                message = "Company deleted successfully!"
-            });
+            // Return success message
+            return Ok(new { message = "Företaget har tagits bort framgångsrikt." });
         }
         catch (KeyNotFoundException ex)
         {
             _logger.LogError("Company not found during deletion: {ErrorMessage}", ex.Message);
-            return NotFound(new { message = "Company not found." });  // Handle company not found errors
+            return NotFound(new { message = "Företaget hittades inte." }); // Handle company not found error
         }
         catch (Exception ex)
         {
-            _logger.LogError("Unexpected error during company deletion: {ErrorMessage}", ex.Message);
-            return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+            _logger.LogError(ex, "Unexpected error during company deletion.");
+            return StatusCode(500, new { message = "Ett oväntat fel inträffade.", details = ex.Message });
         }
     }
 }

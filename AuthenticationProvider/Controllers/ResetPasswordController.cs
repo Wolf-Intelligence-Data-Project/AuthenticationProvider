@@ -1,207 +1,194 @@
-﻿using AuthenticationProvider.Interfaces;
+﻿using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Controllers
+namespace AuthenticationProvider.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class ResetPasswordController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class ResetPasswordController : ControllerBase
+    private readonly IResetPasswordTokenService _resetPasswordTokenService;
+    private readonly IResetPasswordService _resetPasswordEmailService;
+    private readonly ILogger<ResetPasswordController> _logger;
+
+    // Constructor injection for the required services and logger
+    public ResetPasswordController(
+        IResetPasswordTokenService resetPasswordTokenService,
+        IResetPasswordService resetPasswordEmailService,
+        ILogger<ResetPasswordController> logger)
     {
-        private readonly IResetPasswordTokenService _resetPasswordTokenService;
-        private readonly IResetPasswordService _resetPasswordEmailService;
-        private readonly ILogger<ResetPasswordController> _logger;
+        _resetPasswordTokenService = resetPasswordTokenService ?? throw new ArgumentNullException(nameof(resetPasswordTokenService));
+        _resetPasswordEmailService = resetPasswordEmailService ?? throw new ArgumentNullException(nameof(resetPasswordEmailService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
-        // Constructor injection for services
-        public ResetPasswordController(
-            IResetPasswordTokenService resetPasswordTokenService,
-            IResetPasswordService resetPasswordEmailService,
-            ILogger<ResetPasswordController> logger)
+    // Endpoint to request a reset password token
+    [HttpPost("request-reset-password-token")]
+    public async Task<IActionResult> RequestResetPasswordToken([FromBody] string Email)
+    {
+        // Validate the ModelState to ensure the input is correct
+        if (!ModelState.IsValid)
         {
-            _resetPasswordTokenService = resetPasswordTokenService ?? throw new ArgumentNullException(nameof(resetPasswordTokenService));
-            _resetPasswordEmailService = resetPasswordEmailService ?? throw new ArgumentNullException(nameof(resetPasswordEmailService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            return BadRequest(new { message = "Ogiltig modellstatus." });
         }
 
-        // Endpoint to request a reset password token
-        [HttpPost("request-reset-password-token")]
-        public async Task<IActionResult> RequestResetPasswordToken([FromBody] string Email)
+        // Ensure the email is provided
+        if (string.IsNullOrEmpty(Email))
         {
-            if (string.IsNullOrEmpty(Email))
-            {
-                return BadRequest(new { message = "Email is required." });
-            }
-
-            try
-            {
-                // Generate a reset password token using the provided email
-                var resetPasswordToken = await _resetPasswordTokenService.CreateResetPasswordTokenAsync(Email);
-
-                if (string.IsNullOrEmpty(resetPasswordToken))
-                {
-                    return StatusCode(500, new { message = "Failed to generate reset password token." });
-                }
-
-                // Send the token to the company's registered email
-                var emailSent = await _resetPasswordEmailService.SendResetPasswordEmailAsync(resetPasswordToken);
-
-                if (!emailSent)
-                {
-                    return StatusCode(500, new { message = "Failed to send reset password email. Please try again later." });
-                }
-
-                return Ok(new { message = "A password reset token has been sent to your email." });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while requesting reset password token.");
-                return StatusCode(500, new { message = "An error occurred while processing your request.", details = ex.Message });
-            }
+            return BadRequest(new { message = "E-postadress krävs." }); 
         }
 
-
-        // Change the GET route for validating reset password token to a unique one
-        [HttpGet("validate-reset-password-token")]
-        public async Task<IActionResult> ValidateResetPasswordToken([FromQuery] string token)
+        try
         {
-            if (string.IsNullOrEmpty(token))
+            // Generate a reset password token using the provided email
+            var resetPasswordToken = await _resetPasswordTokenService.CreateResetPasswordTokenAsync(Email);
+
+            if (string.IsNullOrEmpty(resetPasswordToken))
             {
-                return BadRequest(new { message = "Token is required." });
+                return StatusCode(500, new { message = "Misslyckades med att generera återställningstoken för lösenord." }); 
             }
 
-            try
-            {
-                // Validate and retrieve the reset password token
-                var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
+            // Send the token to the company's registered email
+            var emailSent = await _resetPasswordEmailService.SendResetPasswordEmailAsync(resetPasswordToken);
 
-                if (resetPasswordToken == null)
-                {
-                    return BadRequest(new { message = "Invalid or expired reset password token." });
-                }
-
-                // If token is valid, redirect to frontend page with token
-                return Redirect($"https://yourfrontend.com/reset-password?token={token}");
-            }
-            catch (Exception ex)
+            if (!emailSent)
             {
-                _logger.LogError(ex, "Error while validating reset password token.");
-                return StatusCode(500, new { message = "An error occurred while processing your request.", details = ex.Message });
+                return StatusCode(500, new { message = "Misslyckades med att skicka e-post för lösenordsåterställning. Försök igen senare." }); 
             }
+
+            return Ok(new { message = "En återställningstoken för lösenord har skickats till din e-postadress." }); 
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while requesting reset password token.");
+            return StatusCode(500, new { message = "Ett fel inträffade vid behandlingen av din begäran.", details = ex.Message });
+        }
+    }
+
+    // Endpoint to complete the password reset
+    [HttpPost("reset-password/complete")]
+    public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordDto resetPasswordRequest)
+    {
+        // Validate the ModelState to ensure input is correct
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { message = "Ogiltig modellstatus." });
         }
 
-        [HttpGet("reset-password")]
-        public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
+        // Check if the request contains necessary data
+        if (resetPasswordRequest == null || string.IsNullOrEmpty(resetPasswordRequest.Token) ||
+            string.IsNullOrEmpty(resetPasswordRequest.NewPassword) ||
+            string.IsNullOrEmpty(resetPasswordRequest.ConfirmPassword))
         {
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning("Reset password link clicked without a token.");
-                return BadRequest(new { message = "Token is required." });
-            }
-
-            try
-            {
-                // Log the token and timestamp for tracking
-                _logger.LogInformation("Reset password link clicked with token: {Token} at {Timestamp}", token, DateTime.UtcNow);
-
-                // Validate the token (e.g., check if it's valid and not expired)
-                var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
-
-                if (resetPasswordToken == null)
-                {
-                    _logger.LogWarning("Invalid or expired token accessed: {Token} at {Timestamp}", token, DateTime.UtcNow);
-                    return BadRequest(new { message = "Invalid or expired token." });
-                }
-
-                // Log successful token validation
-                _logger.LogInformation("Valid token accessed: {Token} at {Timestamp}", token, DateTime.UtcNow);
-
-                // If the token is valid, redirect to the frontend page with the token
-                return Redirect($"http://localhost:3004/reset-password?token={token}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating reset password token: {Token} at {Timestamp}", token, DateTime.UtcNow);
-                return StatusCode(500, new { message = "An error occurred while processing your request.", details = ex.Message });
-            }
+            return BadRequest(new { message = "Ogiltig indata. Alla fält är obligatoriska." });
         }
 
-
-        [HttpPost("reset-password/complete")]
-        public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordDto resetPasswordRequest)
+        // Ensure new password and confirm password match
+        if (resetPasswordRequest.NewPassword != resetPasswordRequest.ConfirmPassword)
         {
-            if (resetPasswordRequest == null || string.IsNullOrEmpty(resetPasswordRequest.Token) ||
-                string.IsNullOrEmpty(resetPasswordRequest.NewPassword) ||
-                string.IsNullOrEmpty(resetPasswordRequest.ConfirmPassword))
-            {
-                return BadRequest(new { message = "Invalid input data. All fields are required." });
-            }
-
-            if (resetPasswordRequest.NewPassword != resetPasswordRequest.ConfirmPassword)
-            {
-                return BadRequest(new { message = "New password and confirm password do not match." });
-            }
-
-            try
-            {
-                // Get email from the token
-                var email = await _resetPasswordTokenService.GetEmailFromTokenAsync(resetPasswordRequest.Token);
-                if (string.IsNullOrEmpty(email))
-                {
-                    return BadRequest(new { message = "Invalid or expired reset password token." });
-                }
-
-                // Reset the company's password
-                var passwordResetSuccessful = await _resetPasswordTokenService.ResetCompanyPasswordAsync(email, resetPasswordRequest.NewPassword);
-
-                if (!passwordResetSuccessful)
-                {
-                    return StatusCode(500, new { message = "Failed to update the password. Please try again later." });
-                }
-
-                // Assuming resetPasswordRequest.Token is a string token (JWT or reset password token string)
-                var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
-
-                if (resetPasswordToken == null)
-                {
-                    return BadRequest(new { message = "Invalid or expired reset password token." });
-                }
-
-                // Mark the token as used using its Guid
-                await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id); // resetPasswordToken.Id is a Guid
-
-                return Ok(new { message = "Password has been reset successfully." });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while resetting password.");
-                return StatusCode(500, new { message = "An error occurred while processing your request.", details = ex.Message });
-            }
+            return BadRequest(new { message = "Lösenord och bekräfta lösenord matchar inte." });
         }
 
-
-        // Endpoint to invalidate all reset password tokens for a company
-        [HttpPost("invalidate-reset-password-tokens/{companyId}")]
-        public async Task<IActionResult> InvalidateResetPasswordTokens(Guid companyId)
+        try
         {
-            if (companyId == Guid.Empty)
+            // Get email from the token (this could be a JWT or other reset token)
+            var email = await _resetPasswordTokenService.GetEmailFromTokenAsync(resetPasswordRequest.Token);
+            if (string.IsNullOrEmpty(email))
             {
-                return BadRequest(new { message = "Invalid company ID." });
+                return BadRequest(new { message = "Ogiltig eller utgången återställningstoken för lösenord." });
             }
 
-            try
+            // Reset the company's password with the new password
+            var passwordResetSuccessful = await _resetPasswordTokenService.ResetCompanyPasswordAsync(email, resetPasswordRequest.NewPassword);
+
+            if (!passwordResetSuccessful)
             {
-                // Delete all reset password tokens for the specified company
-                await _resetPasswordTokenService.DeleteResetPasswordTokensForCompanyAsync(companyId);
-                return Ok(new { message = "All reset password tokens for the specified company have been invalidated." });
+                return StatusCode(500, new { message = "Misslyckades med att uppdatera lösenordet. Försök igen senare." });
             }
-            catch (Exception ex)
+
+            // Validate the reset password token (e.g., check if it's valid and not expired)
+            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
+
+            if (resetPasswordToken == null)
             {
-                _logger.LogError(ex, "Error while invalidating reset password tokens.");
-                return StatusCode(500, new { message = "An error occurred while processing your request.", details = ex.Message });
+                return BadRequest(new { message = "Ogiltig eller utgången återställningstoken för lösenord." });
             }
+
+            // Mark the token as used to prevent reuse
+            await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id); // resetPasswordToken.Id is a Guid
+
+            return Ok(new { message = "Lösenordet har återställts framgångsrikt." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while resetting password.");
+            return StatusCode(500, new { message = "Ett fel inträffade vid återställning av lösenord.", details = ex.Message });
+        }
+    }
+
+    // Endpoint to handle the reset password page request (with a token query parameter)
+    [HttpGet("reset-password")]
+    public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
+    {
+        // Ensure the token is provided
+        if (string.IsNullOrEmpty(token))
+        {
+            _logger.LogWarning("Reset password link clicked without a token.");
+            return BadRequest(new { message = "Token krävs." });
+        }
+
+        try
+        {
+            // Log the token and timestamp for tracking
+            _logger.LogInformation("Reset password link clicked with token: {Token} at {Timestamp}", token, DateTime.UtcNow);
+
+            // Validate the token (e.g., check if it's valid and not expired)
+            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
+
+            if (resetPasswordToken == null)
+            {
+                _logger.LogWarning("Invalid or expired token accessed: {Token} at {Timestamp}", token, DateTime.UtcNow);
+                return BadRequest(new { message = "Ogiltig eller utgången token." });
+            }
+
+            // Log successful token validation
+            _logger.LogInformation("Valid token accessed: {Token} at {Timestamp}", token, DateTime.UtcNow);
+
+            // If the token is valid, redirect to the frontend page with the token
+            return Redirect($"http://localhost:3001" +
+                $"/reset-password?token={token}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating reset password token: {Token} at {Timestamp}", token, DateTime.UtcNow);
+            return StatusCode(500, new { message = "Ett fel inträffade vid validering av återställningstoken för lösenord.", details = ex.Message });
+        }
+    }
+
+    // Endpoint to invalidate all reset password tokens for a company
+    [HttpPost("invalidate-reset-password-tokens/{companyId}")]
+    public async Task<IActionResult> InvalidateResetPasswordTokens(Guid companyId)
+    {
+        // Ensure the companyId is valid
+        if (companyId == Guid.Empty)
+        {
+            return BadRequest(new { message = "Ogiltigt företags-ID." });
+        }
+
+        try
+        {
+            // Delete all reset password tokens for the specified company
+            await _resetPasswordTokenService.DeleteResetPasswordTokensForCompanyAsync(companyId);
+            return Ok(new { message = "Alla återställningstoken för lösenord för det angivna företaget har ogiltigförklarats." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while invalidating reset password tokens.");
+            return StatusCode(500, new { message = "Ett fel inträffade vid invalidisering av återställningstoken för lösenord.", details = ex.Message });
         }
     }
 }

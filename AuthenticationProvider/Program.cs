@@ -1,22 +1,23 @@
 using AuthenticationProvider.Data;
 using AuthenticationProvider.Interfaces;
-using AuthenticationProvider.Models.Tokens;
 using AuthenticationProvider.Repositories;
 using AuthenticationProvider.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Identity;  // Add this namespace
-using AuthenticationProvider.Models;
+using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Services.Clients;
 using AuthenticationProvider.Services.Tokens;
-using AuthenticationProvider.Interfaces.Services;  // Make sure this namespace contains your ApplicationUser class
+using AuthenticationProvider.Interfaces.Services;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using AuthenticationProvider.Repositories.Tokens;  // Make sure this namespace contains your ApplicationUser class
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add logging
-builder.Logging.AddConsole();  // Log to the console
-builder.Logging.AddDebug();    // Log to the debug output window
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();  
 
 // Register DbContext with SQL Server
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -31,9 +32,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 builder.Services.AddScoped<IAccountVerificationTokenRepository, AccountVerificationTokenRepository>();
 builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerificationTokenService>();
 builder.Services.AddScoped<IAccountVerificationService, AccountVerificationService>();
+builder.Services.AddScoped<IAccountVerificationClient, AccountVerificationClient>();
 
 builder.Services.AddScoped<IAccessTokenService, AccessTokenService>();
-builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 
 builder.Services.AddScoped<ISignInService, SignInService>();
 builder.Services.AddScoped<ISignUpService, SignUpService>();
@@ -48,20 +49,53 @@ builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepo
 builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
 builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 
-
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/ResetPassword");
+    var resetPasswordEndpoint = builder.Configuration.GetValue<string>("ResetPasswordProvider:Endpoint");
+    client.BaseAddress = new Uri(resetPasswordEndpoint);
 });
 
-// Register HttpClient for EmailVerificationClient
+
+// Register HttpClient for AccountVerificationClient
 builder.Services.AddHttpClient<AccountVerificationClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:7092/api/AccountVerification");
+    var accountVerificationEndpoint = builder.Configuration.GetValue<string>("AccountVerificationProvider:Endpoint");
+    client.BaseAddress = new Uri(accountVerificationEndpoint);
 });
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ClockSkew = TimeSpan.Zero,
+
+            // Custom claim validation for token type
+            RoleClaimType = "TokenType"
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var tokenType = context.Principal?.FindFirst("TokenType")?.Value;
+
+                // Example: Allow only specific token types
+                if (tokenType != "Access" && tokenType != "ResetPassword" && tokenType != "AccountVerification")
+                {
+                    context.Fail("Invalid token type.");
+                }
+
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 // Register IMemoryCache
 builder.Services.AddMemoryCache();

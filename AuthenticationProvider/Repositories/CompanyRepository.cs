@@ -1,10 +1,10 @@
 ﻿using AuthenticationProvider.Data;
 using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
-using Azure;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Threading.Tasks;
+using System;
 
 namespace AuthenticationProvider.Repositories;
 
@@ -111,7 +111,8 @@ public class CompanyRepository : ICompanyRepository
             throw;  // Re-throw the exception to handle it elsewhere
         }
     }
-    // Add this method to the CompanyRepository
+
+    // Retrieve a company by ID
     public async Task<CompanyEntity> GetByIdAsync(Guid companyId)
     {
         try
@@ -129,6 +130,7 @@ public class CompanyRepository : ICompanyRepository
             throw;  // Re-throw the exception to handle it elsewhere
         }
     }
+
     // Delete a company by its ID
     public async Task DeleteAsync(Guid companyId)
     {
@@ -152,8 +154,13 @@ public class CompanyRepository : ICompanyRepository
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException("Could not delete.");
+            // Log the exception
+            Console.WriteLine($"Error deleting company: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+            }
+            throw new InvalidOperationException("Could not delete."); // Provide a user-friendly message
         }
     }
-
 }

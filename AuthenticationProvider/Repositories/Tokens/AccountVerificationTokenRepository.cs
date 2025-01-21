@@ -1,0 +1,192 @@
+﻿using AuthenticationProvider.Data;
+using AuthenticationProvider.Data.Entities;
+using AuthenticationProvider.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace AuthenticationProvider.Repositories.Tokens;
+
+/// <summary>
+/// Repository for handling operations related to account verification tokens.
+/// </summary>
+public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ILogger<AccountVerificationTokenRepository> _logger;
+
+    public AccountVerificationTokenRepository(ApplicationDbContext context, ILogger<AccountVerificationTokenRepository> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Creates a new account verification token and saves it to the database.
+    /// </summary>
+    /// <param name="token">The token entity to be created.</param>
+    /// <returns>The created token entity.</returns>
+    public async Task<AccountVerificationTokenEntity> CreateAsync(AccountVerificationTokenEntity token)
+    {
+        try
+        {
+            await _context.AccountVerificationTokens.AddAsync(token);
+            await _context.SaveChangesAsync();
+            return token;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while creating the account verification token.");
+            throw new InvalidOperationException("Fel vid skapande av verifieringstoken.", ex);  // User-facing message in Swedish
+        }
+    }
+
+    /// <summary>
+    /// Retrieves an un-used account verification token by its token string.
+    /// </summary>
+    /// <param name="token">The token string to search for.</param>
+    /// <returns>The found token entity, or null if not found.</returns>
+    public async Task<AccountVerificationTokenEntity> GetByTokenAsync(string token)
+    {
+        try
+        {
+            return await _context.AccountVerificationTokens
+                .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while retrieving the account verification token by token.");
+            throw new InvalidOperationException("Fel vid hämtning av verifieringstoken.", ex);  // User-facing message in Swedish
+        }
+    }
+
+    /// <summary>
+    /// Retrieves an account verification token by its ID.
+    /// </summary>
+    /// <param name="tokenId">The token's unique ID.</param>
+    /// <returns>The found token entity, or null if not found.</returns>
+    public async Task<AccountVerificationTokenEntity> GetTokenByIdAsync(Guid tokenId)
+    {
+        try
+        {
+            return await _context.AccountVerificationTokens
+                                 .FirstOrDefaultAsync(t => t.Id == tokenId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while retrieving the account verification token by ID.");
+            throw new InvalidOperationException("Fel vid hämtning av verifieringstoken med ID.", ex);  // User-facing message in Swedish
+        }
+    }
+
+    /// <summary>
+    /// Marks the specified token as used.
+    /// </summary>
+    /// <param name="tokenId">The token's unique ID.</param>
+    public async Task MarkAsUsedAsync(Guid tokenId)
+    {
+        try
+        {
+            var token = await _context.AccountVerificationTokens.FindAsync(tokenId);
+            if (token != null)
+            {
+                token.IsUsed = true;
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                _logger.LogWarning("Token with ID {TokenId} not found.", tokenId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while marking the token as used.");
+            throw new InvalidOperationException("Fel vid att markera verifieringstoken som använd.", ex);  // User-facing message in Swedish
+        }
+    }
+
+    /// <summary>
+    /// Revokes and deletes all account verification tokens for a specific company.
+    /// </summary>
+    /// <param name="companyId">The company's unique ID.</param>
+    public async Task RevokeAndDeleteAsync(Guid companyId)
+    {
+        try
+        {
+            var company = await _context.Companies.FirstOrDefaultAsync(c => c.Id == companyId);
+            if (company == null)
+            {
+                _logger.LogWarning("Company with ID {CompanyId} not found.", companyId);
+                return;
+            }
+
+            if (!company.IsVerified)
+            {
+                _logger.LogInformation("Company with ID {CompanyId} is not verified. Tokens will not be revoked or deleted.", companyId);
+                return;
+            }
+
+            var tokens = await _context.AccountVerificationTokens
+                .Where(t => t.CompanyId == companyId)
+                .ToListAsync();
+
+            if (tokens.Any())
+            {
+                foreach (var token in tokens)
+                {
+                    token.IsUsed = true;
+                }
+
+                _context.AccountVerificationTokens.RemoveRange(tokens);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("All account verification tokens for company {CompanyId} have been revoked and deleted.", companyId);
+            }
+            else
+            {
+                _logger.LogWarning("No tokens found for company {CompanyId} to revoke and delete.", companyId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while revoking and deleting tokens for company {CompanyId}.", companyId);
+            throw new InvalidOperationException("Fel vid att återkalla och ta bort verifieringstoken.", ex);  // User-facing message in Swedish
+        }
+    }
+
+    /// <summary>
+    /// Revokes and deletes a specific account verification token by its token string.
+    /// </summary>
+    /// <param name="token">The token string to be revoked and deleted.</param>
+    public async Task RevokeAndDeleteByTokenAsync(string token)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No token provided for revocation.");
+                return;  // Just return as no action is needed
+            }
+
+            // Retrieve the token from the database
+            var tokenEntity = await _context.AccountVerificationTokens
+                                             .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
+            if (tokenEntity == null)
+            {
+                _logger.LogWarning("Token {Token} not found or already used.", token);
+                return;
+            }
+
+            // Mark the token as used and delete it
+            tokenEntity.IsUsed = true;
+            _context.AccountVerificationTokens.Remove(tokenEntity);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Token {Token} has been revoked and deleted.", token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while revoking and deleting the token {Token}.", token);
+            throw new InvalidOperationException("Fel vid återkallande och borttagning av verifieringstoken.", ex);  // User-facing message in Swedish
+        }
+    }
+}

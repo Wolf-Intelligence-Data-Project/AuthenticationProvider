@@ -3,7 +3,7 @@ using AuthenticationProvider.Models.Responses;
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces;
+namespace AuthenticationProvider.Interfaces.Services;
 
 public interface ISignUpService
 {

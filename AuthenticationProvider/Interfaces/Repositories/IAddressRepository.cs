@@ -13,7 +13,7 @@ public interface IAddressRepository
     Task<AddressEntity> GetByIdAsync(int id);
 
     // Get all addresses for a specific company (Updated to use Guid for companyId)
-    Task<ICollection<AddressEntity>> GetAddressesByCompanyIdAsync(Guid companyId);
+    Task<IEnumerable<AddressEntity>> GetAddressesByCompanyIdAsync(Guid companyId);
 
     // Update an existing address
     Task UpdateAsync(AddressEntity address);

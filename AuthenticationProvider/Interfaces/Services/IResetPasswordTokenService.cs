@@ -2,17 +2,17 @@
 using System;
 using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces
+namespace AuthenticationProvider.Interfaces.Services
 {
     public interface IResetPasswordTokenService
     {
-        Task<string> CreateResetPasswordTokenAsync(string Email);
+        Task<string> CreateResetPasswordTokenAsync(string email);
         Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token);
         Task MarkResetPasswordTokenAsUsedAsync(Guid tokenId);
         Task DeleteResetPasswordTokensForCompanyAsync(Guid companyId);
         Task<bool> ResetCompanyPasswordAsync(string email, string newPassword);
 
-        // Add the GetEmailFromTokenAsync method signature
+        Task<bool> ValidateResetPasswordTokenAsync(string token);
         Task<string> GetEmailFromTokenAsync(string token);
     }
 }
