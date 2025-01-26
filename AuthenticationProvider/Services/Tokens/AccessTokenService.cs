@@ -34,24 +34,21 @@ public class AccessTokenService : IAccessTokenService
     public string GenerateAccessToken(ApplicationUser user)
     {
         if (user == null)
-            throw new ArgumentNullException(nameof(user), "User cannot be null.");
+            throw new ArgumentNullException(nameof(user), "Användaren finns inte."); 
 
-        // Retrieve the JWT configuration values
         var secretKey = _configuration["Jwt:Key"];
         var issuer = _configuration["Jwt:Issuer"];
         var audience = _configuration["Jwt:Audience"];
 
-        // Check for null or empty values in the configuration
         if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
         {
-            _logger.LogError("JWT configuration values are missing. Ensure 'Jwt:Key' and 'Jwt:Issuer' are set in the configuration.");
-            throw new InvalidOperationException("JWT configuration values are missing.");
+            throw new InvalidOperationException("Det gick inte att logga in.");
         }
 
         // Ensure user.IsVerified is not null or false
         if (user.IsVerified == null)
         {
-            _logger.LogWarning("User's 'IsVerified' status is null.");
+            _logger.LogWarning("The user is not verified.");
         }
 
         var claims = new[] {
@@ -59,7 +56,6 @@ public class AccessTokenService : IAccessTokenService
             new Claim("companyId", user.Id),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("isVerified", user.IsVerified.ToString().ToLower()),
-
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -68,7 +64,7 @@ public class AccessTokenService : IAccessTokenService
         var token = new JwtSecurityToken(
             issuer: issuer,
             claims: claims,
-            expires: DateTime.Now.AddHours(1), // Configurable expiration
+            expires: DateTime.Now.AddHours(1),
             signingCredentials: creds
         );
 
@@ -90,7 +86,7 @@ public class AccessTokenService : IAccessTokenService
                 // Add the token to the blacklist to prevent further usage
                 _blacklistedTokens[token] = true;
 
-                // Remove the token from in-memory storage (if you use that approach)
+                // Remove the token from in-memory storage
                 _tokenStore.TryRemove(userId, out _);
             }
         }
@@ -99,7 +95,6 @@ public class AccessTokenService : IAccessTokenService
             _logger.LogError($"Error revoking token: {ex.Message}");
         }
     }
-
 
     public string GetUserIdFromToken(string token)
     {
@@ -114,7 +109,7 @@ public class AccessTokenService : IAccessTokenService
         catch (Exception ex)
         {
             _logger.LogError($"Error decoding token: {ex.Message}");
-            return null; // Invalid token or error in decoding
+            return null;
         }
     }
 
@@ -124,14 +119,13 @@ public class AccessTokenService : IAccessTokenService
         {
             if (_blacklistedTokens.ContainsKey(token))
             {
-                _logger.LogWarning($"Token has been blacklisted: {token}");
                 return false;
             }
 
             var handler = new JwtSecurityTokenHandler();
             handler.ValidateToken(token, new TokenValidationParameters
             {
-                ValidateAudience = true, 
+                ValidateAudience = true,
                 ValidateIssuer = true,
                 ValidIssuer = _configuration["Jwt:Issuer"],
                 ValidAudience = _configuration["Jwt:Audience"],
@@ -149,6 +143,4 @@ public class AccessTokenService : IAccessTokenService
             return false;
         }
     }
-
-
 }

@@ -6,9 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AuthenticationProvider.Repositories.Tokens;
 
-/// <summary>
 /// Repository for handling operations related to account verification tokens.
-/// </summary>
 public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
 {
     private readonly ApplicationDbContext _context;
@@ -35,8 +33,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while creating the account verification token.");
-            throw new InvalidOperationException("Fel vid skapande av verifieringstoken.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Det gick inte verifiera kontot.", ex);
         }
     }
 
@@ -54,8 +51,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while retrieving the account verification token by token.");
-            throw new InvalidOperationException("Fel vid hämtning av verifieringstoken.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Det gick inte verifiera kontot.", ex);
         }
     }
 
@@ -73,8 +69,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while retrieving the account verification token by ID.");
-            throw new InvalidOperationException("Fel vid hämtning av verifieringstoken med ID.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Det gick inte verifiera kontot.", ex);
         }
     }
 
@@ -99,8 +94,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while marking the token as used.");
-            throw new InvalidOperationException("Fel vid att markera verifieringstoken som använd.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Det gick inte verifiera kontot.", ex);
         }
     }
 
@@ -115,13 +109,12 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
             var company = await _context.Companies.FirstOrDefaultAsync(c => c.Id == companyId);
             if (company == null)
             {
-                _logger.LogWarning("Company with ID {CompanyId} not found.", companyId);
+                _logger.LogWarning("Company not found.");
                 return;
             }
 
             if (!company.IsVerified)
             {
-                _logger.LogInformation("Company with ID {CompanyId} is not verified. Tokens will not be revoked or deleted.", companyId);
                 return;
             }
 
@@ -138,18 +131,15 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
 
                 _context.AccountVerificationTokens.RemoveRange(tokens);
                 await _context.SaveChangesAsync();
-
-                _logger.LogInformation("All account verification tokens for company {CompanyId} have been revoked and deleted.", companyId);
             }
             else
             {
-                _logger.LogWarning("No tokens found for company {CompanyId} to revoke and delete.", companyId);
+                _logger.LogWarning("No tokens found.");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while revoking and deleting tokens for company {CompanyId}.", companyId);
-            throw new InvalidOperationException("Fel vid att återkalla och ta bort verifieringstoken.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Fel vid att återkalla och ta bort verifieringstoken.", ex);
         }
     }
 
@@ -172,7 +162,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
                                              .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
             if (tokenEntity == null)
             {
-                _logger.LogWarning("Token {Token} not found or already used.", token);
+                _logger.LogWarning("Token not found or already used.");
                 return;
             }
 
@@ -181,12 +171,11 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
             _context.AccountVerificationTokens.Remove(tokenEntity);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Token {Token} has been revoked and deleted.", token);
+            _logger.LogInformation("Token has been revoked and deleted.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while revoking and deleting the token {Token}.", token);
-            throw new InvalidOperationException("Fel vid återkallande och borttagning av verifieringstoken.", ex);  // User-facing message in Swedish
+            throw new InvalidOperationException("Det gick inte verifiera kontot.", ex);
         }
     }
 }

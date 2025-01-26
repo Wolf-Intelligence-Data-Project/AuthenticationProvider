@@ -2,98 +2,106 @@
 using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
-using System;
 
 namespace AuthenticationProvider.Repositories;
 
+/// <summary>
+/// Repository for managing company-related data operations in the database.
+/// Implements the ICompanyRepository interface.
+/// </summary>
 public class CompanyRepository : ICompanyRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<CompanyRepository> _logger;
 
-    public CompanyRepository(ApplicationDbContext context)
+    public CompanyRepository(ApplicationDbContext context, ILogger<CompanyRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
-    // Check if a company exists by organisation number or email
+    /// <summary>
+    /// Checks if a company with the given organisation number or email already exists in the database.
+    /// </summary>
+    /// <param name="organisationNumber">The organisation number of the company.</param>
+    /// <param name="email">The email of the company.</param>
+    /// <returns>A boolean indicating whether the company exists.</returns>
     public async Task<bool> CompanyExistsAsync(string organisationNumber, string email)
     {
         try
         {
             return await _context.Set<CompanyEntity>()
-                .AnyAsync(c => c.OrganisationNumber == organisationNumber || c.Email == email); // Check for either OrganisationNumber or Email
+                .AnyAsync(c => c.OrganizationNumber == organisationNumber || c.Email == email);
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error checking company existence: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error checking if company exists.");
+            throw;
         }
     }
 
-    // Add a new company
+    /// <summary>
+    /// Adds a new company to the database. Throws an exception if a company with the same organisation number or email exists.
+    /// </summary>
+    /// <param name="company">The company entity to add.</param>
     public async Task AddAsync(CompanyEntity company)
     {
         try
         {
-            // Check if company with same organisation number or email already exists
+            // Check if the company already exists
             bool companyExists = await _context.Set<CompanyEntity>()
-                .AnyAsync(c => c.OrganisationNumber == company.OrganisationNumber || c.Email == company.Email);
+                .AnyAsync(c => c.OrganizationNumber == company.OrganizationNumber || c.Email == company.Email);
 
             if (companyExists)
             {
-                throw new InvalidOperationException("Företaget med samma organisationsnummer eller e-postadress existerar redan.");  // "The company with the same organisation number or email already exists."
+                throw new InvalidOperationException("Företaget med samma organisationsnummer eller e-postadress existerar redan.");
             }
 
+            // Add the company to the database
             await _context.Set<CompanyEntity>().AddAsync(company);
             await _context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error adding company: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error adding company.");
+            throw;
         }
     }
 
-    // Update an existing company
+    /// <summary>
+    /// Updates an existing company in the database. Throws an exception if the company does not exist.
+    /// </summary>
+    /// <param name="company">The updated company entity.</param>
     public async Task UpdateAsync(CompanyEntity company)
     {
         try
         {
+            // Find the existing company by its ID
             var existingCompany = await _context.Set<CompanyEntity>().FindAsync(company.Id);
 
             if (existingCompany == null)
             {
-                throw new InvalidOperationException("Företaget finns inte.");  // "The company does not exist."
+                throw new InvalidOperationException("Företaget finns inte.");
             }
-
             _context.Set<CompanyEntity>().Update(company);
             await _context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error updating company: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error updating company.");
+            throw;
         }
     }
 
-    // Retrieve a company by email
+    /// <summary>
+    /// Retrieves a company entity by its email address.
+    /// </summary>
+    /// <param name="email">The email address of the company.</param>
+    /// <returns>The company entity if found, otherwise null.</returns>
     public async Task<CompanyEntity> GetByEmailAsync(string email)
     {
         try
@@ -102,17 +110,17 @@ public class CompanyRepository : ICompanyRepository
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error retrieving company by email: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            // Log error details
+            _logger.LogError(ex, "Error retrieving company by email.");
+            throw;
         }
     }
 
-    // Retrieve a company by ID
+    /// <summary>
+    /// Retrieves a company entity by its unique ID.
+    /// </summary>
+    /// <param name="companyId">The unique ID of the company.</param>
+    /// <returns>The company entity if found, otherwise null.</returns>
     public async Task<CompanyEntity> GetByIdAsync(Guid companyId)
     {
         try
@@ -121,23 +129,22 @@ public class CompanyRepository : ICompanyRepository
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error retrieving company by ID: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error retrieving company by ID.");
+            throw;
         }
     }
 
-    // Delete a company by its ID
+    /// <summary>
+    /// Deletes a company from the database by its unique ID, including associated addresses.
+    /// </summary>
+    /// <param name="companyId">The unique ID of the company to delete.</param>
     public async Task DeleteAsync(Guid companyId)
     {
         try
         {
+            // Retrieve the company with related addresses
             var company = await _context.Companies
-                .Include(c => c.Addresses)  // Ensure related addresses are loaded
+                .Include(c => c.Addresses)
                 .FirstOrDefaultAsync(c => c.Id == companyId);
 
             if (company == null)
@@ -145,22 +152,15 @@ public class CompanyRepository : ICompanyRepository
                 throw new InvalidOperationException("Företaget finns inte.");
             }
 
-            // Remove all associated addresses
+            // Remove related addresses and the company itself
             _context.Addresses.RemoveRange(company.Addresses);
-
-            // Remove the company
             _context.Companies.Remove(company);
             await _context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error deleting company: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw new InvalidOperationException("Could not delete."); // Provide a user-friendly message
+            _logger.LogError(ex, "Error deleting company.");
+            throw new InvalidOperationException("Could not delete.");
         }
     }
 }

@@ -12,7 +12,6 @@ public class ResetPasswordClient : IResetPasswordClient
 
     public ResetPasswordClient(HttpClient httpClient, IConfiguration configuration, ILogger<ResetPasswordClient> logger)
     {
-        // Initialize HttpClient, reset password endpoint, and logger
         _httpClient = httpClient;
         _resetPasswordEndpoint = configuration["ResetPasswordProvider:Endpoint"]
             ?? throw new ArgumentNullException("Endpoint is not configured.");
@@ -52,7 +51,7 @@ public class ResetPasswordClient : IResetPasswordClient
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Failed to send reset password email. Status code: {StatusCode}. Error: {ErrorContent}", response.StatusCode, errorContent);
+                _logger.LogError("Failed to send reset password email.");
                 return false;
             }
         }

@@ -3,9 +3,7 @@ using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models.Responses;
 using Microsoft.IdentityModel.Tokens;
-using System;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
 
@@ -22,9 +20,6 @@ namespace AuthenticationProvider.Services.Clients
         private readonly ILogger<AccountVerificationService> _logger;
         private readonly IConfiguration _configuration;
 
-
-        /// Constructor for dependency injection.
-
         public AccountVerificationService(
             IAccountVerificationTokenRepository accountVerificationTokenRepository,
             IAccountVerificationClient accountVerificationClient,
@@ -36,7 +31,7 @@ namespace AuthenticationProvider.Services.Clients
             _accountVerificationClient = accountVerificationClient;
             _companyRepository = companyRepository;
             _logger = logger;
-            _configuration = configuration; // Initialize _configuration
+            _configuration = configuration;
         }
 
 
@@ -50,18 +45,17 @@ namespace AuthenticationProvider.Services.Clients
                 var result = await _accountVerificationClient.SendVerificationEmailAsync(token);
                 if (!result)
                 {
-                    _logger.LogError("Failed to send email for token: {Token}", token);
+                    _logger.LogError("Failed to send email.");
                     return false;
                 }
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending verification email for token: {Token}", token);
+                _logger.LogError(ex, "Error sending verification email");
                 return false;
             }
         }
-
 
         /// Verifies the account using the provided token.
 
@@ -77,7 +71,6 @@ namespace AuthenticationProvider.Services.Clients
             var claimsPrincipal = ValidateAccountVerificationToken(token);
             if (claimsPrincipal == null)
             {
-                _logger.LogWarning("Invalid token: {Token}", token);
                 return VerificationResult.InvalidToken;
             }
 
@@ -85,7 +78,7 @@ namespace AuthenticationProvider.Services.Clients
             var email = ExtractEmailFromToken(token);
             if (string.IsNullOrEmpty(email))
             {
-                _logger.LogWarning("Email not found in token: {Token}", token);
+                _logger.LogWarning("Email not found.");
                 return VerificationResult.EmailNotFound;
             }
 
@@ -93,7 +86,7 @@ namespace AuthenticationProvider.Services.Clients
             var company = await _companyRepository.GetByEmailAsync(email);
             if (company == null)
             {
-                _logger.LogWarning("Company not found with email: {Email}", email);
+                _logger.LogWarning("Company not found.");
                 return VerificationResult.CompanyNotFound;
             }
 
@@ -112,11 +105,10 @@ namespace AuthenticationProvider.Services.Clients
             var revokeResult = await RevokeTokenAsync(token);
             if (!revokeResult)
             {
-                _logger.LogError("Failed to revoke and delete tokens for company: {CompanyId}", company.Id);
                 return VerificationResult.InvalidToken;
             }
 
-            _logger.LogInformation("Account verified successfully for company: {CompanyId}", company.Id);
+            _logger.LogInformation("Account verified successfully.");
             return VerificationResult.Success;
         }
 
@@ -140,7 +132,7 @@ namespace AuthenticationProvider.Services.Clients
                     ValidIssuer = issuer,
                     ValidAudience = audience,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ClockSkew = TimeSpan.Zero // Optional: Adjust for more precise expiration validation
+                    ClockSkew = TimeSpan.Zero
                 };
 
                 // Validate the token
@@ -151,23 +143,21 @@ namespace AuthenticationProvider.Services.Clients
                 {
                     return claimsPrincipal;
                 }
-
-                _logger.LogWarning("Invalid JWT structure for token: {Token}", token);
                 return null;
             }
             catch (SecurityTokenExpiredException ex)
             {
-                _logger.LogWarning("Token has expired: {Message}", ex.Message);
+                _logger.LogWarning("Token has expired.");
                 return null;
             }
             catch (SecurityTokenException ex)
             {
-                _logger.LogWarning("Token validation failed: {Message}", ex.Message);
+                _logger.LogWarning("Token validation failed.");
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error while validating account verification token.");
+                _logger.LogError(ex, "Unexpected error while validating account.");
                 return null;
             }
         }
@@ -180,7 +170,7 @@ namespace AuthenticationProvider.Services.Clients
             {
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var decodedToken = tokenHandler.ReadJwtToken(token);
-                var emailClaim = decodedToken?.Claims.FirstOrDefault(c => c.Type == "email");  // Ensure 'email' claim is used
+                var emailClaim = decodedToken?.Claims.FirstOrDefault(c => c.Type == "email");
                 return emailClaim?.Value;
             }
             catch (Exception ex)
@@ -198,17 +188,13 @@ namespace AuthenticationProvider.Services.Clients
 
             try
             {
-                _logger.LogInformation("Revoking and deleting token: {Token}", token);
-
                 // Perform the revocation action (no result expected from the repository method)
                 await _accountVerificationTokenRepository.RevokeAndDeleteByTokenAsync(token);
 
-                _logger.LogInformation("Token successfully revoked and deleted: {Token}", token);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while revoking and deleting token: {Token}", token);
                 return false;
             }
         }

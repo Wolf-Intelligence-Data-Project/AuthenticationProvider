@@ -1,8 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using AuthenticationProvider.Data;
-using System.Linq;
 using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Repositories;
@@ -10,13 +13,18 @@ namespace AuthenticationProvider.Repositories;
 public class AddressRepository : IAddressRepository
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ILogger<AddressRepository> _logger;
 
-    public AddressRepository(ApplicationDbContext dbContext)
+    public AddressRepository(ApplicationDbContext dbContext, ILogger<AddressRepository> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
-    // Add a new address to the database
+    /// <summary>
+    /// Adds a new address to the database with uniqueness checks for the same company.
+    /// </summary>
+    /// <param name="address">The address entity to add.</param>
     public async Task AddAsync(AddressEntity address)
     {
         try
@@ -26,11 +34,11 @@ public class AddressRepository : IAddressRepository
                 .AnyAsync(a => a.StreetAddress == address.StreetAddress
                                && a.PostalCode == address.PostalCode
                                && a.City == address.City
-                               && a.CompanyId == address.CompanyId); // Ensure uniqueness per company
+                               && a.CompanyId == address.CompanyId);
 
             if (!isAddressUnique)
             {
-                throw new InvalidOperationException("Adressen existerar redan i systemet.");  // "The address already exists in the system."
+                throw new InvalidOperationException("Adressen existerar redan i systemet.");
             }
 
             // If adding a primary address, check if the company already has a primary address
@@ -41,7 +49,7 @@ public class AddressRepository : IAddressRepository
 
                 if (hasPrimaryAddress)
                 {
-                    throw new InvalidOperationException("Företaget har redan en primäradress.");  // "The company already has a primary address."
+                    throw new InvalidOperationException("Företaget har redan en primäradress.");
                 }
             }
 
@@ -51,17 +59,16 @@ public class AddressRepository : IAddressRepository
         }
         catch (Exception ex)
         {
-            // Log the exception (example log)
-            Console.WriteLine($"Error adding address: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error adding address.");
+            throw;
         }
     }
 
-    // Get an address by its ID
+    /// <summary>
+    /// Retrieves an address by its ID.
+    /// </summary>
+    /// <param name="id">The ID of the address to retrieve.</param>
+    /// <returns>The address entity if found, otherwise null.</returns>
     public async Task<AddressEntity> GetByIdAsync(int id)
     {
         try
@@ -72,17 +79,16 @@ public class AddressRepository : IAddressRepository
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error retrieving address by ID: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error retrieving the address");
+            throw;
         }
     }
 
-    // Get all addresses for a specific company
+    /// <summary>
+    /// Retrieves all addresses for a specific company.
+    /// </summary>
+    /// <param name="companyId">The ID of the company whose addresses to retrieve.</param>
+    /// <returns>A collection of address entities.</returns>
     public async Task<IEnumerable<AddressEntity>> GetAddressesByCompanyIdAsync(Guid companyId)
     {
         try
@@ -93,17 +99,15 @@ public class AddressRepository : IAddressRepository
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error retrieving addresses by company ID: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error retrieving addresses.");
+            throw;
         }
     }
 
-    // Update an existing address
+    /// <summary>
+    /// Updates an existing address in the database.
+    /// </summary>
+    /// <param name="address">The updated address entity.</param>
     public async Task UpdateAsync(AddressEntity address)
     {
         try
@@ -116,7 +120,7 @@ public class AddressRepository : IAddressRepository
 
                 if (hasPrimaryAddress)
                 {
-                    throw new InvalidOperationException("Företaget har redan en primäradress.");  // "The company already has a primary address."
+                    throw new InvalidOperationException("Företaget har redan en primäradress.");
                 }
             }
 
@@ -125,13 +129,8 @@ public class AddressRepository : IAddressRepository
         }
         catch (Exception ex)
         {
-            // Log the exception
-            Console.WriteLine($"Error updating address: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-            }
-            throw;  // Re-throw the exception to handle it elsewhere
+            _logger.LogError(ex, "Error updating address.");
+            throw;
         }
     }
 }

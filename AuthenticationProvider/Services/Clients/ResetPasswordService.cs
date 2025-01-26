@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
-using AuthenticationProvider.Models;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Data.Dtos;
 
 namespace AuthenticationProvider.Services.Clients;
 
@@ -116,7 +116,7 @@ public class ResetPasswordService : IResetPasswordService
             var company = await _companyRepository.GetByIdAsync(resetPasswordToken.CompanyId);
             if (company != null)
             {
-                company.PasswordHash = _passwordHasher.HashPassword(null, resetPasswordRequest.NewPassword); // Identity's PasswordHasher
+                company.PasswordHash = _passwordHasher.HashPassword(null, resetPasswordRequest.NewPassword);
                 await _companyRepository.UpdateAsync(company);
             }
             else

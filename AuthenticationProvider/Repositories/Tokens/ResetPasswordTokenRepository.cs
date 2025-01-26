@@ -31,7 +31,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while retrieving reset password token by ID.");
-            throw new Exception("Det gick inte att hämta lösenordsåterställningstoken."); // User-friendly message in Swedish
+            throw new Exception("Det gick inte att hämta lösenordsåterställningstoken.");
         }
     }
 
@@ -49,8 +49,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while retrieving reset password token by token.");
-            throw new Exception("Det gick inte att hämta lösenordsåterställningstoken."); // User-friendly message in Swedish
+            throw new Exception("Det gick inte återställa lösenordet.");
         }
     }
 
@@ -69,8 +68,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while creating reset password token.");
-            throw new Exception("Det gick inte att skapa lösenordsåterställningstoken."); // User-friendly message in Swedish
+            throw new Exception("Det gick inte återställa lösenordet.");
         }
     }
 
@@ -94,8 +92,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while deleting reset password tokens for company ID {CompanyId}.", companyId);
-            throw new Exception("Det gick inte att ta bort lösenordsåterställningstoken."); // User-friendly message in Swedish
+            throw new Exception("Det gick inte återställa lösenordet.");
         }
     }
 
@@ -116,8 +113,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while marking reset password token as used for token ID {TokenId}.", tokenId);
-            throw new Exception("Det gick inte att markera lösenordsåterställningstoken som använd."); // User-friendly message in Swedish
+            throw new Exception("Det gick inte återställa lösenordet.");
         }
     }
 }

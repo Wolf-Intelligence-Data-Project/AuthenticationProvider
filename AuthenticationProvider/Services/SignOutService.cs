@@ -13,13 +13,6 @@ public class SignOutService : ISignOutService
 {
     private readonly IMemoryCache _cache;
     private readonly ILogger<SignOutService> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="SignOutService"/> class.
-    /// </summary>
-    /// <param name="cache">An instance of <see cref="IMemoryCache"/> for managing cached tokens.</param>
-    /// <param name="logger">An instance of <see cref="ILogger{SignOutService}"/> for logging.</param>
-    /// <exception cref="ArgumentNullException">Thrown when the provided arguments are null.</exception>
     public SignOutService(IMemoryCache cache, ILogger<SignOutService> logger)
     {
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
@@ -39,22 +32,21 @@ public class SignOutService : ISignOutService
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("Sign-out failed: Token is null or empty.");
-            return false; // Invalid token input, sign-out cannot proceed
+            return false; 
         }
 
         try
         {
-            // Attempt to remove the token from memory cache
+            // Remove the token from memory cache
             _cache.Remove(token);
 
             _logger.LogInformation("Token successfully removed during sign-out: {Token}", token);
-            return true; // Operation successful
+            return true;
         }
         catch (Exception ex)
         {
-            // Log and handle unexpected errors during token removal
             _logger.LogError(ex, "An error occurred while removing the token during sign-out: {Token}", token);
-            return false; // Operation failed
+            return false; 
         }
     }
 }

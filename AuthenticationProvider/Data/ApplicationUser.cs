@@ -2,6 +2,8 @@
 
 namespace AuthenticationProvider.Data;
 
+
+// Needed because of Identity
 public class ApplicationUser : IdentityUser
 {
     // Company properties

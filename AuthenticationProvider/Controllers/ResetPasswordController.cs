@@ -1,5 +1,5 @@
-﻿using AuthenticationProvider.Interfaces.Services;
-using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Data.Dtos;
+using AuthenticationProvider.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;

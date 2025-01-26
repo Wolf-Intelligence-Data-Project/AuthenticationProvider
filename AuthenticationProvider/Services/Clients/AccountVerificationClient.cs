@@ -9,8 +9,6 @@ public class AccountVerificationClient : IAccountVerificationClient
     private readonly HttpClient _httpClient;
     private readonly string _accountVerificationEndpoint;
     private readonly ILogger<AccountVerificationClient> _logger;
-
-    // Constructor to inject HttpClient, configuration, and logger
     public AccountVerificationClient(HttpClient httpClient, IConfiguration configuration, ILogger<AccountVerificationClient> logger)
     {
         _httpClient = httpClient;
@@ -52,7 +50,7 @@ public class AccountVerificationClient : IAccountVerificationClient
             }
             else
             {
-                _logger.LogWarning("Failed to send account verification email. Status code: {StatusCode}", response.StatusCode);
+                _logger.LogWarning("Failed to send account verification email.");
                 return false;
             }
         }
