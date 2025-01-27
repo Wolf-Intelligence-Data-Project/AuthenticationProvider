@@ -2,7 +2,7 @@
 
 namespace AuthenticationProvider.Data.Dtos;
 
-public class PasswordDto
+public class PasswordChangeRequest
 {
     [Required(ErrorMessage = "Lösenord krävs.")]
     [DataType(DataType.Password)]
@@ -15,4 +15,7 @@ public class PasswordDto
     [DataType(DataType.Password)]
     [Compare("Password", ErrorMessage = "Lösenorden matchar inte.")]
     public string ConfirmPassword { get; set; } = null!;
+
+    [Required]
+    public string Token { get; set; } = null!;
 }

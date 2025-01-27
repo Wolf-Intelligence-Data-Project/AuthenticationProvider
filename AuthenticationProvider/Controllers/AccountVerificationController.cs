@@ -1,13 +1,8 @@
 ﻿using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Models;
-using AuthenticationProvider.Services.Clients;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System;
-using System.ComponentModel.Design;
-using System.Threading.Tasks;
+
 
 namespace AuthenticationProvider.Controllers;
 [ApiController]

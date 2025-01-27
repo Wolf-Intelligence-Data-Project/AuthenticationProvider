@@ -11,7 +11,8 @@ using AuthenticationProvider.Interfaces.Services;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using AuthenticationProvider.Repositories.Tokens;  // Make sure this namespace contains your ApplicationUser class
+using AuthenticationProvider.Repositories.Tokens;
+using AuthenticationProvider.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddDefaultTokenProviders();  // Registering Identity services
 
 // Register your application services
+builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
 builder.Services.AddScoped<IAccountVerificationTokenRepository, AccountVerificationTokenRepository>();
 builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerificationTokenService>();
 builder.Services.AddScoped<IAccountVerificationService, AccountVerificationService>();
