@@ -1,11 +1,11 @@
-﻿using AuthenticationProvider.Data.Entities;
-using AuthenticationProvider.Interfaces.Repositories;
+﻿using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Services.Tokens;
 
@@ -35,12 +35,14 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
     {
         try
         {
+            // Check if email is valid
             if (string.IsNullOrEmpty(email))
             {
                 _logger.LogWarning("Email is null or empty.");
                 throw new ArgumentException("E-postadress är obligatorisk.");
             }
 
+            // Fetch the company by email
             var company = await _companyRepository.GetByEmailAsync(email);
             if (company == null)
             {
@@ -48,18 +50,20 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 throw new ArgumentException("Inget företag hittades med den angivna e-postadressen.");
             }
 
+            // Delete any existing reset password tokens for the company
             await _resetPasswordTokenRepository.DeleteAsync(company.Id);
 
+            // JWT configuration and validation
             var secretKey = _configuration["Jwt:Key"];
             var issuer = _configuration["Jwt:Issuer"];
             var audience = _configuration["Jwt:Audience"];
 
-            // Ensure that necessary JWT settings are available
             if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
             {
                 throw new ArgumentNullException("JWT-inställningar saknas i konfigurationen.");
             }
 
+            // Setup security and signing credentials for the JWT
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
@@ -67,43 +71,46 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
+                Subject = new ClaimsIdentity(new[] 
                 {
-                    new Claim(ClaimTypes.NameIdentifier, company.Id.ToString()), 
+                    new Claim(ClaimTypes.NameIdentifier, company.Id.ToString()),
                     new Claim(ClaimTypes.Email, company.Email),
                     new Claim("token_type", "ResetPassword"),
-                    new Claim(JwtRegisteredClaimNames.Aud, audience) 
+                    new Claim(JwtRegisteredClaimNames.Aud, audience)
                 }),
                 Expires = DateTime.UtcNow.AddHours(1),
-                Issuer = issuer, 
+                Issuer = issuer,
                 Audience = audience,
-                SigningCredentials = credentials 
+                SigningCredentials = credentials
             };
 
             // Create the JWT token
             var jwtToken = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(jwtToken); 
+            var tokenString = tokenHandler.WriteToken(jwtToken);
 
-            // Create the reset password token entity and persist it in the repository
+            // Create the reset password token entity
             var resetPasswordToken = new ResetPasswordTokenEntity
             {
                 Token = tokenString,
                 CompanyId = company.Id,
-                ExpiryDate = DateTime.UtcNow.AddHours(1), 
+                ExpiryDate = DateTime.UtcNow.AddHours(1),
                 IsUsed = false
             };
 
+            // Save the reset password token to the repository
             await _resetPasswordTokenRepository.CreateAsync(resetPasswordToken);
 
             return tokenString;
         }
         catch (ArgumentException ex)
         {
+            // Handle argument exceptions
             _logger.LogWarning(ex, "Validation error.");
-            throw; 
+            throw;
         }
         catch (Exception ex)
         {
+            // Log unexpected errors
             _logger.LogError(ex, "An unexpected error occurred.");
             throw new InvalidOperationException("Ett oväntat fel uppstod, försök igen senare.");
         }
@@ -124,10 +131,10 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             if (resetPasswordToken == null || resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < DateTime.UtcNow)
             {
                 _logger.LogWarning("The reset password token is invalid, expired, or already used.");
-                return null; 
+                return null;
             }
 
-            return resetPasswordToken; 
+            return resetPasswordToken;
         }
         catch (Exception ex)
         {
@@ -157,38 +164,12 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
 
             // Retrieve the associated company by the token's company ID
             var company = await _companyRepository.GetByIdAsync(resetPasswordToken.CompanyId);
-            return company?.Email; 
+            return company?.Email;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while extracting email from reset password token.");
             throw new InvalidOperationException("Ett fel uppstod vid hämtning av e-post. Försök igen senare.");
-        }
-    }
-
-    // Reset the company's password by email and new password
-    public async Task<bool> ResetCompanyPasswordAsync(string email, string newPassword)
-    {
-        var company = await _companyRepository.GetByEmailAsync(email);
-        if (company == null)
-        {
-            _logger.LogWarning("Company not found with email: {Email}", email);
-            return false; 
-        }
-
-        try
-        {
-            var hashedPassword = _passwordHasher.HashPassword(null, newPassword);
-            company.PasswordHash = hashedPassword;
-            await _companyRepository.UpdateAsync(company);
-
-            _logger.LogInformation("Password reset successfully for company: {CompanyId}", company.Id);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while resetting password for company: {CompanyId}", company.Id);
-            throw new InvalidOperationException("Ett fel uppstod vid återställning av lösenord. Försök igen senare.");
         }
     }
 
@@ -215,6 +196,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         }
     }
 
+    // Delete all reset password tokens for a company
     public async Task DeleteResetPasswordTokensForCompanyAsync(Guid companyId)
     {
         try
@@ -230,7 +212,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
     }
 
     // Helper method to validate the reset password token
-    private async Task<bool> ValidateResetPasswordTokenAsync(string token)
+    public async Task<bool> ValidateResetPasswordTokenAsync(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -247,12 +229,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while validating the reset password token.");
-            return false; 
+            return false;
         }
-    }
-
-    Task<bool> IResetPasswordTokenService.ValidateResetPasswordTokenAsync(string token)
-    {
-        throw new NotImplementedException();
     }
 }

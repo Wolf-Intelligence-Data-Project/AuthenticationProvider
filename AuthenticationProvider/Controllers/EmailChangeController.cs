@@ -1,10 +1,14 @@
-﻿using AuthenticationProvider.Data.Dtos;
-using AuthenticationProvider.Interfaces.Services;
+﻿using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Controllers;
 
+/// <summary>
+/// Controller responsible for handling email change requests and operations.
+/// </summary>
 [Route("api/[controller]")]
 [ApiController]
 public class EmailChangeController : ControllerBase
@@ -18,12 +22,22 @@ public class EmailChangeController : ControllerBase
         _emailChangeService = emailChangeService ?? throw new ArgumentNullException(nameof(emailChangeService));
     }
 
+    /// <summary>
+    /// Endpoint to change the email address for a user.
+    /// </summary>
+    /// <param name="request">EmailChangeRequest containing new email details.</param>
+    /// <returns>Returns success or failure message based on the outcome.</returns>
     [HttpPatch("change-email")]
     public async Task<IActionResult> ChangeEmail([FromBody] EmailChangeRequest request)
     {
         if (request == null)
         {
-            return BadRequest("Invalid request.");
+            return BadRequest(ErrorResponses.InvalidInput);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ErrorResponses.ModelStateError);
         }
 
         try
@@ -33,19 +47,23 @@ public class EmailChangeController : ControllerBase
 
             if (!result)
             {
-                return BadRequest("E-postadress kan inte uppdateras.");
+                return BadRequest(new
+                {
+                    ErrorCode = "EMAIL_UPDATE_FAILED",
+                    ErrorMessage = "E-postadress kan inte uppdateras.",
+                    ErrorDetails = "Det gick inte att uppdatera e-postadressen, vänligen försök igen senare."
+                });
             }
 
-            return Ok("E-postadress har uppdaterats.");
+            return Ok(new { message = "E-postadress har uppdaterats." });
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized("Ogiltig eller utgången token.");
+            return Unauthorized(ErrorResponses.TokenExpiredOrInvalid);
         }
         catch (Exception ex)
         {
-            // Log the exception (if you have logging configured)
-            return StatusCode(500, "Ett internt fel uppstod.");
+            return StatusCode(500, ErrorResponses.InternalServerError);
         }
     }
 }

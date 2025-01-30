@@ -1,127 +1,119 @@
-﻿using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Services;
-using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses;
+using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace AuthenticationProvider.Controllers;
+
+/// <summary>
+/// Controller responsible for handling account verification requests and operations.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AccountVerificationController : ControllerBase
 {
+    private readonly IAccountVerificationService _accountVerificationService;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
-    private readonly IAccountVerificationService _accountVerificationService; // Add the service here
-    private readonly ICompanyRepository _companyRepository;
     private readonly ILogger<AccountVerificationController> _logger;
 
     public AccountVerificationController(
+        IAccountVerificationService accountVerificationService,
         IAccountVerificationTokenService accountVerificationTokenService,
-        IAccountVerificationService accountVerificationService, // Inject the service here
-        ICompanyRepository companyRepository,
         ILogger<AccountVerificationController> logger)
     {
         _accountVerificationTokenService = accountVerificationTokenService;
-        _accountVerificationService = accountVerificationService; // Initialize the injected service here
-        _companyRepository = companyRepository;
+        _accountVerificationService = accountVerificationService;
         _logger = logger;
     }
 
-    [HttpGet("verify-email")]
-    public async Task<IActionResult> VerifyEmail(string token)
+    /// <summary>
+    /// Sends a verification email to the account associated with the provided token.
+    /// </summary>
+    /// <param name="request">Contains the token for account verification.</param>
+    /// <returns>
+    /// Status message based on the result of the email sending operation:
+    /// - 200 OK: If the email was successfully sent.
+    /// - 400 Bad Request: If the token is missing or invalid.
+    /// - 500 Internal Server Error: If an error occurred while sending the email.
+    /// </returns>
+    [HttpPost("send-verification-email")]
+    public async Task<IActionResult> SendVerificationEmail([FromBody] TokenRequest request)
     {
-        if (string.IsNullOrEmpty(token))
+        if (string.IsNullOrWhiteSpace(request.Token))
         {
-            _logger.LogWarning("No token provided for email verification.");
-            return BadRequest("Något gick fel.");
+            _logger.LogWarning("Token is missing for the send verification email request.");
+            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
         try
         {
-            // Validate the token first
-            var accountVerificationToken = await _accountVerificationTokenService.GetValidAccountVerificationTokenAsync(token);
-            if (accountVerificationToken == null)
+            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(request.Token);
+            if (emailSent != ServiceResult.Success)
             {
-                _logger.LogWarning("Invalid or expired token provided for email verification.");
-                return BadRequest("Ogiltigt session.");
+                _logger.LogError("Failed to send verification email.");
+                return StatusCode(500, ErrorResponses.EmailSendFailure);
             }
 
-            // Fetch the company related to this token
-            var company = await _companyRepository.GetByIdAsync(accountVerificationToken.CompanyId);
-            if (company == null)
-            {
-                _logger.LogWarning("No company found associated with the token.");
-                return BadRequest("Kontot kunde inte hittas.");
-            }
-
-           
-
-            // Mark token as used
-            await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(token);
-
-            // Optionally, revoke and delete all tokens for this company
-            await _accountVerificationTokenService.DeleteAccountVerificationTokensForCompanyAsync(company.Id);
-
-            // Update IsVerified flag in the company entity
-            company.IsVerified = true;
-
-            // Save the company entity with the updated IsVerified flag
-            await _companyRepository.UpdateAsync(company);
-
-            // Return success response
-            _logger.LogInformation("Email verified successfully for company: {CompanyId}", company.Id);
-            return Redirect("http://localhost:3000/verification-success");
+            _logger.LogInformation("Verification email sent.");
+            return Ok("Verifierings-e-post skickades framgångsrikt.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while verifying email for token: {Token}", token);
-            return StatusCode(500, "Ett fel inträffade vid verifiering av e-postadress.");
+            _logger.LogError(ex, "An error occurred while sending verification email.");
+            return StatusCode(500, ErrorResponses.GeneralError);
         }
     }
 
-
-    [HttpPost("resend-verification-email")]
-    public async Task<IActionResult> ResendVerificationEmail([FromBody] EmailDto emailDto)
+    /// <summary>
+    /// Verifies the account using the provided verification token.
+    /// </summary>
+    /// <param name="request">Contains the token for account verification.</param>
+    /// <returns>
+    /// Status message based on the verification result:
+    /// - 200 OK: If the account was successfully verified.
+    /// - 400 Bad Request: If the token is invalid or expired.
+    /// - 404 Not Found: If the account is not found.
+    /// - 500 Internal Server Error: If an error occurs during the verification process.
+    /// </returns>
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] TokenRequest request)
     {
-        if (string.IsNullOrEmpty(emailDto.Email))
+        // Validate the token
+        if (request == null || string.IsNullOrWhiteSpace(request.Token))
         {
-            _logger.LogWarning("No email provided for resending verification email.");
-            return BadRequest(new { message = "Email is required." });
+            _logger.LogWarning("Token is missing for the verify email request.");
+            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
+        }
+
+        // Validate the account verification token
+        var result = await _accountVerificationTokenService.ValidateAccountVerificationTokenAsync(request);
+        if (result is UnauthorizedObjectResult || result is BadRequestObjectResult)
+        {
+            return result;  // Return error response if token is invalid or expired
         }
 
         try
         {
-            // Fetch the company by email
-            var company = await _companyRepository.GetByEmailAsync(emailDto.Email);
-            if (company == null)
+            var verificationResult = await _accountVerificationService.VerifyEmailAsync(request.Token);
+
+            // Handle different verification result outcomes
+            return verificationResult switch
             {
-                _logger.LogWarning("Company not found with email: {Email}", emailDto.Email);
-                return BadRequest(new { message = "Company not found." });
-            }
-
-            // Generate a new account verification token for the company
-            var token = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
-
-            // Send the token to the email verification provider (using the injected service)
-            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
-
-            if (!emailSent)
-            {
-                return StatusCode(500, new { message = "Failed to send verification email." });
-            }
-
-            _logger.LogInformation("Verification email resent to company with email: {Email}", emailDto.Email);
-
-            // Return success response
-            return Ok(new { message = "Verification email resent." });
+                ServiceResult.Success => Ok("Kontot verifierades framgångsrikt."),  // Success
+                ServiceResult.InvalidToken => BadRequest(ErrorResponses.TokenExpiredOrInvalid),  // Invalid token
+                ServiceResult.EmailNotFound => NotFound(ErrorResponses.EmailNotFound),  // Email not found
+                ServiceResult.CompanyNotFound => NotFound(ErrorResponses.CompanyNotFound),  // Company not found
+                ServiceResult.AlreadyVerified => Ok("Kontot är redan verifierat."),  // Already verified
+                ServiceResult.Failure => StatusCode(500, ErrorResponses.VerificationFailed),  // Failure
+                _ => StatusCode(500, ErrorResponses.GeneralError)  // General error
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while resending the verification email for email: {Email}", emailDto.Email);
-            return StatusCode(500, new { message = "An error occurred while resending the verification email." });
+            _logger.LogError(ex, "An error occurred while verifying account.");
+            return StatusCode(500, ErrorResponses.GeneralError);
         }
     }
-
-
-
-
 }

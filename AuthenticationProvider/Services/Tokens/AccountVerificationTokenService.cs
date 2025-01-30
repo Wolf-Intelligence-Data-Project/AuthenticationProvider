@@ -1,7 +1,9 @@
-﻿using AuthenticationProvider.Data.Entities;
-using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Services;
-using AuthenticationProvider.Repositories.Tokens;
+﻿using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Models.Data.Entities;
+using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses.Errors;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -102,11 +104,12 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         return tokenString;
     }
 
-    public async Task<ClaimsPrincipal> ValidateAccountVerificationTokenAsync(string token)
+    public async Task<IActionResult> ValidateAccountVerificationTokenAsync([FromBody] TokenRequest request)
     {
-        if (string.IsNullOrEmpty(token))
+        if (string.IsNullOrEmpty(request?.Token))
         {
-            throw new ArgumentNullException("Det gick inte att verifiera kontot."); 
+            _logger.LogWarning("Token is null or empty.");
+            return new BadRequestObjectResult(ErrorResponses.TokenExpiredOrInvalid);
         }
 
         try
@@ -118,7 +121,8 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
 
             if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
             {
-                throw new ArgumentNullException("Det gick inte att verifiera kontot."); 
+                _logger.LogError("JWT settings are missing from configuration.");
+                throw new ArgumentNullException("JWT settings are missing from configuration.");
             }
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -130,11 +134,11 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
                 ValidIssuer = issuer,
                 ValidAudience = audience,
                 IssuerSigningKey = securityKey,
-                ClockSkew = TimeSpan.Zero
+                ClockSkew = TimeSpan.Zero // no clock skew allowed
             };
 
             // Validate the token and extract claims
-            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            var principal = tokenHandler.ValidateToken(request.Token, validationParameters, out var validatedToken);
 
             // Check if token type is correct for account verification
             var jwtToken = validatedToken as JwtSecurityToken;
@@ -142,28 +146,28 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
 
             if (tokenTypeClaim != "AccountVerification")
             {
-                throw new SecurityTokenException("Det gick inte att verifiera kontot.");
+                _logger.LogWarning("Invalid token type: {TokenType}", tokenTypeClaim);
+                return new UnauthorizedObjectResult(ErrorResponses.TokenExpiredOrInvalid);
             }
 
-            return principal;
+            return new OkObjectResult(principal); // Token is valid
         }
         catch (SecurityTokenExpiredException)
         {
             _logger.LogWarning("Account verification token has expired.");
-            throw new UnauthorizedAccessException("Det gick inte att verifiera kontot.");
+            return new UnauthorizedObjectResult(ErrorResponses.TokenExpiredOrInvalid);
         }
         catch (SecurityTokenException ex)
         {
             _logger.LogError("Invalid token: {Message}", ex.Message);
-            throw new UnauthorizedAccessException("Det gick inte att verifiera kontot."); 
+            return new UnauthorizedObjectResult(ErrorResponses.TokenExpiredOrInvalid);
         }
         catch (Exception ex)
         {
             _logger.LogError("An error occurred while validating token: {Message}", ex.Message);
-            throw new UnauthorizedAccessException("Det gick inte att verifiera kontot.");
+            return new UnauthorizedObjectResult(ErrorResponses.TokenExpiredOrInvalid);
         }
     }
-
 
 
     public async Task MarkAccountVerificationTokenAsUsedAsync(string token)
@@ -214,4 +218,5 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
     {
         await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
     }
+
 }

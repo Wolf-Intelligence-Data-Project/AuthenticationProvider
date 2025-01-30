@@ -1,6 +1,6 @@
 ﻿using AuthenticationProvider.Models.Responses;
-using AuthenticationProvider.Data.Dtos;
 using System.Threading.Tasks;
+using AuthenticationProvider.Models.Data.Dtos;
 
 namespace AuthenticationProvider.Interfaces.Services;
 

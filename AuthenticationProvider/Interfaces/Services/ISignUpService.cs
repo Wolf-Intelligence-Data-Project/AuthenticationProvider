@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Data.Dtos;
+﻿using AuthenticationProvider.Models.Data.Dtos;
 using AuthenticationProvider.Models.Responses;
 using System;
 using System.Threading.Tasks;

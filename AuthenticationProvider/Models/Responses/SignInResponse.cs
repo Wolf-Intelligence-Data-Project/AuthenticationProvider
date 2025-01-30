@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Data;
+﻿using AuthenticationProvider.Models.Data;
 
 namespace AuthenticationProvider.Models.Responses;
 

@@ -5,11 +5,14 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
-using AuthenticationProvider.Data.Dtos;
 using AuthenticationProvider.Models.Responses;
-using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Services;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Models.Data.Dtos;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Services;
 
@@ -21,13 +24,15 @@ public class SignUpService : ISignUpService
     private readonly IAddressRepository _addressRepository;
     private readonly ILogger<SignUpService> _logger;
     private readonly PasswordHasher<CompanyEntity> _passwordHasher;
+    private readonly IEmailRestrictionService _emailRestrictionService; // Inject IEmailRestrictionService
 
     public SignUpService(
         ICompanyRepository companyRepository,
         IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationService accountVerificationService,
         IAddressRepository addressRepository,
-        ILogger<SignUpService> logger)
+        ILogger<SignUpService> logger,
+        IEmailRestrictionService emailRestrictionService) // Injected through the constructor
     {
         _companyRepository = companyRepository;
         _accountVerificationTokenService = accountVerificationTokenService;
@@ -35,11 +40,18 @@ public class SignUpService : ISignUpService
         _addressRepository = addressRepository;
         _logger = logger;
         _passwordHasher = new PasswordHasher<CompanyEntity>();
+        _emailRestrictionService = emailRestrictionService; // Assigned here
     }
 
     public async Task<SignUpResponse> RegisterCompanyAsync(SignUpDto request)
     {
         ValidateSignUpRequest(request);
+
+        // Check if the email is restricted before proceeding
+        if (_emailRestrictionService.IsRestrictedEmail(request.Email))
+        {
+            throw new InvalidOperationException("Den angivna e-posten är inte tillåten.");
+        }
 
         if (await _companyRepository.CompanyExistsAsync(request.OrganizationNumber, request.Email))
         {
@@ -73,7 +85,7 @@ public class SignUpService : ISignUpService
 
         // Send the verification email
         var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
-        if (!emailSent)
+        if (emailSent != ServiceResult.Success)
         {
             throw new InvalidOperationException("Det gick inte att skicka verifieringsmail.");
         }
@@ -185,5 +197,4 @@ public class SignUpService : ISignUpService
             throw new InvalidOperationException(errorMessage ?? "Ogiltiga inloggningsuppgifter.");
         }
     }
-
 }

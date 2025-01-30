@@ -1,7 +1,10 @@
-﻿using AuthenticationProvider.Data.Dtos;
-using AuthenticationProvider.Data.Entities;
-using AuthenticationProvider.Interfaces.Repositories;
+﻿using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Models.Data.Entities;
+using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses;
 using Microsoft.AspNetCore.Identity;
 
 namespace AuthenticationProvider.Services.Security;
@@ -14,13 +17,16 @@ public class AccountSecurityService : IAccountSecurityService
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly ILogger<AccountSecurityService> _logger;
     private readonly PasswordHasher<CompanyEntity> _passwordHasher;
+    private readonly IEmailRestrictionService _emailRestrictionService;
 
     public AccountSecurityService(
         ICompanyRepository companyRepository,
         IAccessTokenService accessTokenService,
         IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationService accountVerificationService,
-        ILogger<AccountSecurityService> logger)
+        ILogger<AccountSecurityService> logger,
+        IConfiguration configuration,
+        IEmailRestrictionService emailRestrictionService)
     {
         _companyRepository = companyRepository;
         _accessTokenService = accessTokenService;
@@ -28,126 +34,143 @@ public class AccountSecurityService : IAccountSecurityService
         _accountVerificationService = accountVerificationService;
         _logger = logger;
         _passwordHasher = new PasswordHasher<CompanyEntity>();
+        _emailRestrictionService = emailRestrictionService;
     }
 
-    // Email Change Logic
+    /// <summary>
+    /// Changes the email address of a company after validating the token and email restrictions.
+    /// </summary>
+    /// <param name="emailChangeRequest">The request containing the new email and the token for authentication.</param>
+    /// <returns>True if the email is successfully changed, false otherwise.</returns>
     public async Task<bool> ChangeEmailAsync(EmailChangeRequest emailChangeRequest)
     {
         try
         {
-            // Validate the token
+            // Validate email restrictions - prevent restricted email addresses
+            if (_emailRestrictionService.IsRestrictedEmail(emailChangeRequest.Email))
+            {
+                _logger.LogWarning("Email change request denied for a restricted email.");
+                return false; // Bad request: restricted email
+            }
+
+            // Validate the provided token for authenticity
             if (!_accessTokenService.IsTokenValid(emailChangeRequest.Token))
             {
                 _logger.LogWarning("Invalid token during email change.");
-                return false;
+                return false; // Unauthorized: invalid token
             }
 
-            // Retrieve the company ID from the token
+            // Extract company ID from the token
             var companyIdString = _accessTokenService.GetUserIdFromToken(emailChangeRequest.Token);
             if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
             {
                 _logger.LogWarning("Unable to retrieve or parse company ID from token.");
-                return false;
+                return false; // Bad request: invalid company ID
             }
 
-            // Retrieve the company from the repository by ID
+            // Retrieve the company entity by ID
             var company = await _companyRepository.GetByIdAsync(companyId);
             if (company == null)
             {
                 _logger.LogWarning("Company not found for email change.");
-                return false;
+                return false; // Not found: company does not exist
             }
 
-            // Check if the email already exists in the database
+            // Check if the new email is already in use
             var existingCompany = await _companyRepository.GetByEmailAsync(emailChangeRequest.Email);
             if (existingCompany != null)
             {
                 _logger.LogWarning("Email is already in use.");
-                return false;
+                return false; // Conflict: email already exists
             }
 
-            // Before changing the email, set IsVerified to false
+            // Set the company as unverified before changing the email
             company.IsVerified = false;
             await _companyRepository.UpdateAsync(company);
 
-            // Update email and save changes to the repository
+            // Update the company's email
             company.Email = emailChangeRequest.Email;
             await _companyRepository.UpdateAsync(company);
 
-            // Now, generate a new account verification token and send the verification email
+            // Generate a new verification token and send verification email
             var verificationToken = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(companyId);
-
             var tokenResult = await _accountVerificationService.SendVerificationEmailAsync(verificationToken);
 
-            if (!tokenResult)
+            if (tokenResult != ServiceResult.Success)
             {
                 _logger.LogWarning("Failed to send account verification email.");
-                return false;
+                return false; // Internal Server Error: failure in email sending
             }
 
             _logger.LogInformation("Email successfully changed and verification email sent.");
-            return true;
+            return true; // Success: email changed and verification sent
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error during email change: {ex.Message}");
-            return false;
+            return false; // Internal Server Error: exception occurred
         }
     }
 
-    // Password Change Logic
+    /// <summary>
+    /// Changes the password for a company after validating the token and password match.
+    /// </summary>
+    /// <param name="passwordChangeRequest">The request containing the new password, confirmation, and token for authentication.</param>
+    /// <returns>True if the password is successfully changed, false otherwise.</returns>
     public async Task<bool> ChangePasswordAsync(PasswordChangeRequest passwordChangeRequest)
     {
+        // Ensure valid request parameters
         if (string.IsNullOrWhiteSpace(passwordChangeRequest.Token) ||
             string.IsNullOrWhiteSpace(passwordChangeRequest.Password) ||
             string.IsNullOrWhiteSpace(passwordChangeRequest.ConfirmPassword))
         {
             _logger.LogWarning("Invalid password change request.");
-            return false;
+            return false; // Bad request: missing password fields
         }
 
+        // Ensure that the new password and confirm password match
         if (passwordChangeRequest.Password != passwordChangeRequest.ConfirmPassword)
         {
             _logger.LogWarning("New password and confirm password do not match.");
-            return false;
+            return false; // Bad request: password mismatch
         }
 
         try
         {
-            // Validate the token (same way as email change)
+            // Validate the token (same process as email change)
             if (!_accessTokenService.IsTokenValid(passwordChangeRequest.Token))
             {
                 _logger.LogWarning("Invalid token during password change.");
-                return false;
+                return false; // Unauthorized: invalid token
             }
 
-            // Retrieve the company ID from the token
+            // Extract company ID from the token
             var companyIdString = _accessTokenService.GetUserIdFromToken(passwordChangeRequest.Token);
             if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
             {
                 _logger.LogWarning("Unable to retrieve or parse company ID from token.");
-                return false;
+                return false; // Bad request: invalid company ID
             }
 
-            // Retrieve the company from the repository by ID
+            // Retrieve the company entity by ID
             var company = await _companyRepository.GetByIdAsync(companyId);
             if (company == null)
             {
                 _logger.LogWarning("Company not found for password change.");
-                return false;
+                return false; // Not found: company does not exist
             }
 
-            // Hash the new password and update the company's password
+            // Hash the new password and update the company's password hash
             company.PasswordHash = _passwordHasher.HashPassword(company, passwordChangeRequest.Password);
             await _companyRepository.UpdateAsync(company);
 
             _logger.LogInformation("Password successfully changed.");
-            return true;
+            return true; // Success: password changed
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred while changing the password.");
-            return false;
+            return false; // Internal Server Error: exception occurred
         }
     }
 }

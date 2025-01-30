@@ -1,4 +1,5 @@
 ﻿using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Tokens;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System;
@@ -6,16 +7,17 @@ using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Services;
 
-/// <summary>
-/// Service responsible for handling the sign-out process by removing tokens from memory cache.
-/// </summary>
+// Service responsible for handling the sign-out process by removing tokens from memory cache.
 public class SignOutService : ISignOutService
 {
     private readonly IMemoryCache _cache;
+    private readonly IAccessTokenService _accessTokenService;
     private readonly ILogger<SignOutService> _logger;
-    public SignOutService(IMemoryCache cache, ILogger<SignOutService> logger)
+
+    public SignOutService(IMemoryCache cache, IAccessTokenService accessTokenService, ILogger<SignOutService> logger)
     {
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        _accessTokenService = accessTokenService ?? throw new ArgumentNullException(nameof(accessTokenService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -32,12 +34,17 @@ public class SignOutService : ISignOutService
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("Sign-out failed: Token is null or empty.");
-            return false; 
+            return false;
         }
 
         try
         {
-            // Remove the token from memory cache
+            if (!_accessTokenService.IsTokenValid(token))
+            {
+                _logger.LogInformation("Token is invalid or expired: {Token}", token);
+                return false;
+            }
+
             _cache.Remove(token);
 
             _logger.LogInformation("Token successfully removed during sign-out: {Token}", token);
@@ -46,7 +53,7 @@ public class SignOutService : ISignOutService
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred while removing the token during sign-out: {Token}", token);
-            return false; 
+            return false;
         }
     }
 }

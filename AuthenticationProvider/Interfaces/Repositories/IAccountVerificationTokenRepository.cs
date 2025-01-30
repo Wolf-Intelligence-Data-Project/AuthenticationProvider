@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Data.Entities;
+﻿using AuthenticationProvider.Models.Data.Entities;
 using Microsoft.Extensions.Primitives;
 
 namespace AuthenticationProvider.Interfaces.Repositories;

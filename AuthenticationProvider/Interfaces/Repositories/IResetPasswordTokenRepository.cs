@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Data.Entities;
+﻿using AuthenticationProvider.Models.Data.Entities;
 using System;
 using System.Threading.Tasks;
 

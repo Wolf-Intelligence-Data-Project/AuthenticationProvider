@@ -1,11 +1,8 @@
-using AuthenticationProvider.Data;
-using AuthenticationProvider.Interfaces;
 using AuthenticationProvider.Repositories;
 using AuthenticationProvider.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Services.Clients;
 using AuthenticationProvider.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services;
 using Microsoft.IdentityModel.Tokens;
@@ -13,6 +10,12 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using AuthenticationProvider.Repositories.Tokens;
 using AuthenticationProvider.Services.Security;
+using AuthenticationProvider.Services.Utilities;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Clients;
+using AuthenticationProvider.Models.Data;
+using AuthenticationProvider.Clients;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +53,10 @@ builder.Services.AddScoped<IResetPasswordTokenService, ResetPasswordTokenService
 builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepository>();
 builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
 builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
+
+builder.Services.AddScoped<IBusinessTypeService, BusinessTypeService>();
+builder.Services.AddSingleton<IEmailRestrictionService, EmailRestrictionService>();
+
 
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>

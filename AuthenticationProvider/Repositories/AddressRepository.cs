@@ -1,12 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using AuthenticationProvider.Data;
-using AuthenticationProvider.Data.Entities;
 using AuthenticationProvider.Interfaces.Repositories;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AuthenticationProvider.Models.Data;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Repositories;
 

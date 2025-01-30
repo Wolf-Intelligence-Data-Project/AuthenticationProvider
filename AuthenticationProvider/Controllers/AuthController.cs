@@ -1,119 +1,111 @@
-﻿using AuthenticationProvider.Data.Dtos;
-using AuthenticationProvider.Interfaces.Services;
+﻿using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Models.Data.Dtos;
+using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Controllers;
 
+/// <summary>
+/// Controller responsible for handling authentication (sign up and sign in) requests and operations.
+/// </summary>
 [Route("api/[controller]")]
 [ApiController]
 public class AuthController : ControllerBase
 {
     private readonly ISignInService _signInService;
     private readonly ISignOutService _signOutService;
-    private readonly IAccessTokenService _accessTokenService;
     private readonly ILogger<AuthController> _logger;
 
-    // Constructor dependency injection
     public AuthController(
         ISignInService signInService,
         ISignOutService signOutService,
-        IAccessTokenService accessTokenService,
         ILogger<AuthController> logger)
     {
         _signInService = signInService ?? throw new ArgumentNullException(nameof(signInService));
         _signOutService = signOutService ?? throw new ArgumentNullException(nameof(signOutService));
-        _accessTokenService = accessTokenService ?? throw new ArgumentNullException(nameof(accessTokenService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Login endpoint. Authenticates the company using credentials provided in the SignInDto.
+    /// Endpoint to log in a company by authenticating using the provided credentials.
+    /// Returns a token on successful authentication.
     /// </summary>
-    /// <param name="request">SignInDto containing the company credentials (username/email and password).</param>
-    /// <returns>Returns an authentication token if successful, or a message indicating failure.</returns>
+    /// <param name="request">The credentials to authenticate the company.</param>
+    /// <returns>Returns an authentication token if authentication is successful.</returns>
+    /// <response code="200">If authentication is successful, returns the authentication token.</response>
+    /// <response code="400">If the provided credentials are invalid or the model state is incorrect.</response>
+    /// <response code="401">If authentication fails due to invalid credentials.</response>
+    /// <response code="500">If an error occurs during authentication.</response>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] SignInDto request)
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(new { message = "Ogiltig indata", errors = ModelState });
+            return BadRequest(ErrorResponses.ModelStateError);
         }
 
         try
         {
             var response = await _signInService.SignInAsync(request);
+
             if (response.Success)
             {
-                _logger.LogInformation("Login successful for user: {UserName}", response.User.UserName);
-
+                _logger.LogInformation("Login successful for company: {CompanyEmail}", request.Email);
                 return Ok(new
                 {
                     message = "Inloggning lyckades",
-                    token = response.Token,
-                    user = new { response.User.UserName, response.User.Email }
+                    token = response.Token
                 });
             }
 
-            _logger.LogWarning("Login failed for user: {UserName}", request.Email); // Log failed login attempt
-            return Unauthorized(new { message = "Felaktiga inloggningsuppgifter" });
+            _logger.LogWarning("Login failed for company: {CompanyEmail}. Invalid credentials.", request.Email);
+            return Unauthorized(ErrorResponses.InvalidCredentials);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login attempt for user: {Email}", request.Email);
-            return StatusCode(500, new { message = "Ett fel inträffade vid inloggning." });
+            _logger.LogError(ex, "Error during login attempt for company: {CompanyEmail}.", request.Email);
+            return StatusCode(500, ErrorResponses.GeneralError);
         }
     }
 
     /// <summary>
-    /// Logout endpoint. Invalidates the access token and logs the user out.
+    /// Endpoint to log out the company by invalidating the current session.
+    /// If a token is provided, it will be revoked.
     /// </summary>
-    /// <param name="Authorization">Authorization header containing the Bearer token.</param>
-    /// <returns>Returns a success message if logout is successful, or an error message.</returns>
-    [HttpPost("logout")]
-    public IActionResult Logout([FromHeader] string Authorization)
+    /// <param name="Authorization">Authorization header containing the Bearer token (optional).</param>
+    /// <returns>Returns a success message on successful logout.</returns>
+    /// <response code="200">Logout successful.</response>
+    /// <response code="400">Bad request if the token is invalid or there is an issue during logout.</response>
+    [HttpDelete("logout")]
+    public async Task<IActionResult> Logout([FromHeader] string Authorization)
     {
-        // Check if the Authorization header is provided
-        if (string.IsNullOrEmpty(Authorization))
+        string token = string.Empty;
+
+        // Check if the token is present and starts with "Bearer"
+        if (!string.IsNullOrEmpty(Authorization) && Authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("Logout attempt with no Authorization token.");
-            return BadRequest(new { message = "Ingen token tillhandahölls." });
+            token = Authorization.Substring(7).Trim();
         }
 
-        // Extract the token from the Authorization header
-        var token = Authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                    ? Authorization.Substring(7).Trim()
-                    : string.Empty;
-
-        if (string.IsNullOrEmpty(token))
+        // If token is provided, attempt to sign out
+        if (!string.IsNullOrEmpty(token))
         {
-            _logger.LogWarning("Logout attempt with invalid token format.");
-            return BadRequest(new { message = "Ogiltigt tokenformat." });
-        }
-
-        try
-        {
-            // Log the token being revoked (for internal tracking purposes, ensure this is safe in production)
-            _logger.LogInformation("Logout attempt with token: {Token}", token);
-
-            // Revoke the token and check if it is valid
-            _accessTokenService.RevokeAccessToken(token);
-
-            if (!_accessTokenService.IsTokenValid(token))
+            try
             {
-                _logger.LogInformation("Token is invalid or expired: {Token}", token);
-                return Unauthorized(new { message = "Token är ogiltigt eller har löpt ut." });
+                await _signOutService.SignOutAsync(token);
+                _logger.LogInformation("User logged out successfully with token.");
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during logout attempt with token.");
+                return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
+            }
+        }
+        else
+        {   // Sign out is always possible, even without token
+            _logger.LogWarning("Logout attempted with no token provided.");
+        }
 
-            return Ok(new { message = "Utloggning lyckades." });
-        }
-        catch (Exception ex)
-        {
-            // Log any exception during the logout process
-            _logger.LogError(ex, "Error during logout attempt for token: {Token}", token);
-            return StatusCode(500, new { message = "Ett fel inträffade vid utloggning." });
-        }
+        return Ok(new { message = "Utloggning lyckades." });
     }
 }
