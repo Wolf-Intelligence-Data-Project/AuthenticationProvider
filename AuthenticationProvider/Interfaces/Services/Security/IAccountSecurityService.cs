@@ -1,21 +1,23 @@
 ﻿using AuthenticationProvider.Models.Data.Requests;
-using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces.Services;
+namespace AuthenticationProvider.Interfaces.Utilities.Security;
 
 public interface IAccountSecurityService
 {
     /// <summary>
-    /// Changes the email address for a company.
+    /// Attempts to change the email address of a company after validating the provided security token.
+    /// The request must include a valid authentication token and the new email address.
     /// </summary>
-    /// <param name="emailChangeRequest">The request containing the token and new email address.</param>
-    /// <returns>True if the email was changed successfully, otherwise false.</returns>
+    /// <param name="emailChangeRequest">The request containing the security token and the new email address.</param>
+    /// <returns>True if the email change is successful after validation; otherwise, false.</returns>
     Task<bool> ChangeEmailAsync(EmailChangeRequest emailChangeRequest);
 
     /// <summary>
-    /// Changes the password for a company.
+    /// Attempts to change the password of a company after verifying the provided security token.
+    /// The request must contain the current authentication token, the new password, and a confirmation password.
     /// </summary>
-    /// <param name="passwordChangeRequest">The request containing the token and new passwords.</param>
-    /// <returns>True if the password was changed successfully, otherwise false.</returns>
+    /// <param name="passwordChangeRequest">The request containing the authentication token and new password details.</param>
+    /// <returns>True if the password change is successful after validation; otherwise, false.</returns>
     Task<bool> ChangePasswordAsync(PasswordChangeRequest passwordChangeRequest);
+
 }

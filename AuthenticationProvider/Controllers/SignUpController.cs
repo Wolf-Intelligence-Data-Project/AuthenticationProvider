@@ -1,5 +1,5 @@
-﻿using AuthenticationProvider.Interfaces.Services;
-using AuthenticationProvider.Models.Data.Dtos;
+﻿using AuthenticationProvider.Interfaces.Utilities;
+using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,7 +31,7 @@ public class SignUpController : ControllerBase
     /// <param name="request">The sign-up request containing the company's details, such as name, email, etc.</param>
     /// <returns>A response containing the company ID and verification token if registration is successful, or an error message if validation fails.</returns>
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] SignUpDto request)
+    public async Task<IActionResult> Register([FromBody] SignUpRequest request)
     {
         _logger.LogInformation("Register endpoint called with company data.");
 

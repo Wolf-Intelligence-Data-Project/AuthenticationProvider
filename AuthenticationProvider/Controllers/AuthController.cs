@@ -1,5 +1,5 @@
-﻿using AuthenticationProvider.Interfaces.Services;
-using AuthenticationProvider.Models.Data.Dtos;
+﻿using AuthenticationProvider.Interfaces.Utilities;
+using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,7 +37,7 @@ public class AuthController : ControllerBase
     /// <response code="401">If authentication fails due to invalid credentials.</response>
     /// <response code="500">If an error occurs during authentication.</response>
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] SignInDto request)
+    public async Task<IActionResult> Login([FromBody] SignInRequest request)
     {
         if (!ModelState.IsValid)
         {

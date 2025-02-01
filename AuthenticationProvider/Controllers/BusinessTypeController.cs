@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces.Services;
+﻿using AuthenticationProvider.Interfaces.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthenticationProvider.Controllers;

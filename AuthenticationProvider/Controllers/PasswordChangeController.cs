@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces.Services;
+﻿using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +24,6 @@ public class PasswordChangeController : ControllerBase
     /// <summary>
     /// Change the password for the company using a valid token provided in the request.
     /// </summary>
-    /// <param name="request">The password change request containing the new password and token.</param>
     /// <returns>Returns an action result indicating whether the password change was successful or not.</returns>
     [HttpPatch("change-password")]
     public async Task<IActionResult> ChangePasswordAsync([FromBody] PasswordChangeRequest request)

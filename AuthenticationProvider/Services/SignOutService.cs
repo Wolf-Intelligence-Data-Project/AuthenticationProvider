@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces.Services;
+﻿using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Interfaces.Tokens;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 
 namespace AuthenticationProvider.Services;
 
-// Service responsible for handling the sign-out process by removing tokens from memory cache.
+/// <summary>
+/// Service responsible for handling the sign-out process by removing tokens from memory cache.
+/// </summary>
 public class SignOutService : ISignOutService
 {
     private readonly IMemoryCache _cache;
@@ -41,18 +43,18 @@ public class SignOutService : ISignOutService
         {
             if (!_accessTokenService.IsTokenValid(token))
             {
-                _logger.LogInformation("Token is invalid or expired: {Token}", token);
+                _logger.LogInformation("Token is invalid or expired");
                 return false;
             }
 
             _cache.Remove(token);
 
-            _logger.LogInformation("Token successfully removed during sign-out: {Token}", token);
+            _logger.LogInformation("Token successfully removed during sign-out.");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while removing the token during sign-out: {Token}", token);
+            _logger.LogError(ex, "An error occurred while removing the token during sign-out.");
             return false;
         }
     }

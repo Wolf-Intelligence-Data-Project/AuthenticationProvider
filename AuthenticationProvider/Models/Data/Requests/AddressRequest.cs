@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Dtos;
+namespace AuthenticationProvider.Models.Data.Requests;
 
-public class AddressDto
+public class AddressRequest
 {
     [Required(ErrorMessage = "Gatuadress är obligatorisk.")]
     [RegularExpression(@"^([A-ZÅÄÖ][a-zåäö]*(?:\s[A-ZÅÄÖa-zåäö0-9]*)*)$", ErrorMessage = "Varje ord i gatuadressen måste börja med en stor bokstav och kan innehålla siffror.")]

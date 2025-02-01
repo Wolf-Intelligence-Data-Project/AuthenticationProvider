@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Services.Tokens;
-using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Utilities;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,10 +12,11 @@ using AuthenticationProvider.Repositories.Tokens;
 using AuthenticationProvider.Services.Security;
 using AuthenticationProvider.Services.Utilities;
 using AuthenticationProvider.Interfaces.Tokens;
-using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Interfaces.Clients;
 using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Clients;
+using AuthenticationProvider.Interfaces.Utilities;
 
 var builder = WebApplication.CreateBuilder(args);
 

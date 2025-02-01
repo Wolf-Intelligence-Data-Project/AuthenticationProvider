@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using AuthenticationProvider.Services.Utilities;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AuthenticationProvider.Models.Data.Entities;
 
@@ -28,6 +26,7 @@ public class CompanyEntity
 
     [Required(ErrorMessage = "Affärstyp är obligatorisk.")]
     [RegularExpression(@"^[A-ZÅÄÖ][a-zåäöA-ZÅÄÖ\s]*$", ErrorMessage = "Affärstyp får endast innehålla bokstäver och måste börja med en stor bokstav.")]
+    [ValidateBusinessType(ErrorMessage = "Ogiltig affärstyp. Vänligen välj en giltig affärstyp.")]
     public string BusinessType { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Ansvarig persons namn är obligatoriskt.")]

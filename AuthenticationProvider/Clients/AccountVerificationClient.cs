@@ -4,6 +4,10 @@ using AuthenticationProvider.Interfaces.Clients;
 
 namespace AuthenticationProvider.Clients;
 
+/// <summary>
+/// Handles dispatching account verification tokens to an external service responsible for sending emails to users.
+/// This client communicates with the configured verification provider to request email delivery.
+/// </summary>
 public class AccountVerificationClient : IAccountVerificationClient
 {
     private readonly HttpClient _httpClient;
@@ -19,10 +23,15 @@ public class AccountVerificationClient : IAccountVerificationClient
     }
 
     /// <summary>
-    /// Sends an account verification request (token) to the Email Provider that creates and sends the email
+    /// Sends an account verification request containing a unique token to an external email provider.
+    /// The external provider is responsible for delivering the verification email.
     /// </summary>
-    /// <param name="token">The verification token to send in the email.</param>
-    /// <returns>True if the email was sent successfully; otherwise, false.</returns>
+    /// <param name="token">The verification token required for confirming user identity.</param>
+    /// <returns>
+    /// <c>true</c> if the request was successfully processed by the external provider; otherwise, <c>false</c>.
+    /// </returns>
+    /// <exception cref="HttpRequestException">Thrown if a network-related issue occurs.</exception>
+    /// <exception cref="Exception">Thrown for unexpected failures during the request.</exception>
     public async Task<bool> SendVerificationEmailAsync(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -35,11 +44,10 @@ public class AccountVerificationClient : IAccountVerificationClient
         {
             _logger.LogInformation("Preparing to send verification email.");
 
-            // Create the request payload which contains the token (no email needed)
             var requestPayload = new { Token = token };
             var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Sending request to AccountVerificationProvider endpoint: {Endpoint}", _accountVerificationEndpoint);
+            _logger.LogInformation("Sending request to AccountVerificationProvider endpoint.");
 
             var response = await _httpClient.PostAsync(_accountVerificationEndpoint, content);
 
@@ -50,21 +58,31 @@ public class AccountVerificationClient : IAccountVerificationClient
             }
             else
             {
-                _logger.LogWarning("Failed to send account verification email.");
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500)
+                {
+                    _logger.LogWarning("Client-side error when sending verification email. Status: {StatusCode}, Response: {ResponseContent}",
+                                        response.StatusCode, responseContent);
+                }
+                else if ((int)response.StatusCode >= 500)
+                {
+                    _logger.LogError("Server-side error when sending verification email. Status: {StatusCode}, Response: {ResponseContent}",
+                                      response.StatusCode, responseContent);
+                }
+
                 return false;
             }
         }
         catch (HttpRequestException httpEx)
         {
-            _logger.LogError(httpEx, "An error occurred while sending the account verification email.");
-            Console.WriteLine("Ett problem uppstod vid sändning av verifieringsmejlet.");
-            return false;
+            _logger.LogError(httpEx, "Network error when sending verification email.");
+            throw; // Consider rethrowing if the caller should handle it
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unexpected error occurred.");
-            Console.WriteLine("Ett oväntat fel inträffade.");
-            return false;
+            _logger.LogError(ex, "Unexpected error occurred while sending verification email.");
+            throw;
         }
     }
 }

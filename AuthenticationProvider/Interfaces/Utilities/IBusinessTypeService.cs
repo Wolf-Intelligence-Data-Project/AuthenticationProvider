@@ -1,12 +1,15 @@
-﻿// Interface for the BusinessTypeService
-// Defines the contract for retrieving business types and their display names
-using AuthenticationProvider.Models.Data.Dtos;
-using AuthenticationProvider.Services;
+﻿using AuthenticationProvider.Models.Data.Requests;
 
-namespace AuthenticationProvider.Interfaces.Services;
+namespace AuthenticationProvider.Interfaces.Utilities;
 
 public interface IBusinessTypeService
 {
-    // Method to retrieve all business types with their corresponding display names
+    /// <summary>
+    /// Retrieves a list of all business types, each with its corresponding display name.
+    /// </summary>
+    /// <returns>
+    /// A list of <see cref="BusinessTypeDto"/> objects, 
+    /// where each object contains the value and display name for a business type.
+    /// </returns>
     List<BusinessTypeDto> GetBusinessTypes();
 }

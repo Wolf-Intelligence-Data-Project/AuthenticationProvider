@@ -1,6 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces.Clients;
 using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Responses;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -12,6 +13,7 @@ namespace AuthenticationProvider.Services.Security;
 public class AccountVerificationService : IAccountVerificationService
 {
     private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
+    private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly IAccountVerificationClient _accountVerificationClient;
     private readonly ICompanyRepository _companyRepository;
     private readonly ILogger<AccountVerificationService> _logger;
@@ -19,6 +21,7 @@ public class AccountVerificationService : IAccountVerificationService
 
     public AccountVerificationService(
         IAccountVerificationTokenRepository accountVerificationTokenRepository,
+        IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationClient accountVerificationClient,
         ICompanyRepository companyRepository,
         ILogger<AccountVerificationService> logger,
@@ -26,6 +29,7 @@ public class AccountVerificationService : IAccountVerificationService
     {
         _accountVerificationTokenRepository = accountVerificationTokenRepository;
         _accountVerificationClient = accountVerificationClient;
+        _accountVerificationTokenService = accountVerificationTokenService;
         _companyRepository = companyRepository;
         _logger = logger;
         _configuration = configuration;
@@ -164,4 +168,54 @@ public class AccountVerificationService : IAccountVerificationService
             return false;  // Return false if revocation failed
         }
     }
+
+    public async Task<ServiceResult> ResendVerificationEmailAsync(string email)
+    {
+        if (string.IsNullOrEmpty(email))
+        {
+            _logger.LogWarning("No email provided for resending verification email.");
+            return ServiceResult.Failure;  // Use Failure property directly
+        }
+
+        try
+        {
+            // Fetch the company by email
+            var company = await _companyRepository.GetByEmailAsync(email);
+            if (company == null)
+            {
+                _logger.LogWarning("Company not found with email: {Email}", email);
+                return ServiceResult.Failure;  // Use Failure property directly
+            }
+
+            // Set the company as not verified
+            company.IsVerified = false;
+            await _companyRepository.UpdateAsync(company);
+
+            // Generate a new account verification token for the company
+            var newToken = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
+            if (string.IsNullOrEmpty(newToken))
+            {
+                _logger.LogError("Failed to create a new verification token for company with email: {Email}", email);
+                return ServiceResult.Failure;  // Use Failure property directly
+            }
+
+            // Send the new verification token to the email verification provider
+            var emailSent = await SendVerificationEmailAsync(newToken);
+            if (emailSent != ServiceResult.Success)
+            {
+                return ServiceResult.Failure;  // Use Failure property directly
+            }
+
+            _logger.LogInformation("Verification email resent to company with email: {Email}", email);
+
+            return ServiceResult.Success;  // Return Success if everything went well
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while resending the verification email for email: {Email}", email);
+            return ServiceResult.Failure;  // Use Failure property directly
+        }
+    }
+
+
 }

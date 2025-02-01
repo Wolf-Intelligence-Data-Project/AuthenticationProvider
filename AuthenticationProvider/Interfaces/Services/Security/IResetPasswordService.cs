@@ -1,21 +1,21 @@
-﻿using System.Threading.Tasks;
-using AuthenticationProvider.Models.Data.Dtos;
+﻿using AuthenticationProvider.Models.Data.Requests;
 
-namespace AuthenticationProvider.Interfaces.Services.Security;
+namespace AuthenticationProvider.Interfaces.Utilities.Security;
 
 public interface IResetPasswordService
 {
     /// <summary>
-    /// Sends a reset password email using the provided token.
+    /// Sends an email containing a password reset link with the provided token.
     /// </summary>
-    /// <param name="token">The reset password token.</param>
-    /// <returns>True if the email is sent successfully; otherwise, false.</returns>
+    /// <param name="token">The password reset token.</param>
+    /// <returns>True if the email was sent successfully; otherwise, false.</returns>
     Task<bool> SendResetPasswordEmailAsync(string token);
 
     /// <summary>
-    /// Handles the actual password reset when the user submits the new password.
+    /// Resets the company's password using the provided token and new password.
     /// </summary>
-    /// <param name="resetPasswordRequest">The request containing the token and the new password.</param>
-    /// <returns>True if the password is successfully reset; otherwise, false.</returns>
-    Task<bool> ResetPasswordAsync(ResetPasswordDto resetPasswordRequest);
+    /// <param name="resetPasswordRequest">The request containing the reset token and new password.</param>
+    /// <returns>True if the password was successfully reset; otherwise, false.</returns>
+    Task<bool> ResetPasswordAsync(ResetPasswordRequest resetPasswordRequest);
+
 }

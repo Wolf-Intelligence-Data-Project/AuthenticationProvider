@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Dtos;
+namespace AuthenticationProvider.Models.Data.Requests;
 
-public class ResetPasswordDto
+public class ResetPasswordRequest
 {
     [Required]
     public string Token { get; set; } = null!;

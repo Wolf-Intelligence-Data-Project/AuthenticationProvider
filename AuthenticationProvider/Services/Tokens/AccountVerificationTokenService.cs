@@ -2,6 +2,7 @@
 using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -104,7 +105,7 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         return tokenString;
     }
 
-    public async Task<IActionResult> ValidateAccountVerificationTokenAsync([FromBody] TokenRequest request)
+    public async Task<IActionResult> ValidateAccountVerificationTokenAsync(TokenRequest request)
     {
         if (string.IsNullOrEmpty(request?.Token))
         {
@@ -170,6 +171,7 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
     }
 
 
+
     public async Task MarkAccountVerificationTokenAsUsedAsync(string token)
     {
         var storedToken = await _accountVerificationTokenRepository.GetByTokenAsync(token);
@@ -218,5 +220,4 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
     {
         await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
     }
-
 }

@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Dtos;
+namespace AuthenticationProvider.Models.Data.Requests;
 
-public class SignInDto
+public class SignInRequest
 {
     [Required(ErrorMessage = "Ogiltiga inloggningsuppgifter.")]
     public string Email { get; set; } = null!;

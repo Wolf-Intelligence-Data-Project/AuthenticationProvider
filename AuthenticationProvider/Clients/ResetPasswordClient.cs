@@ -4,6 +4,11 @@ using System.Text;
 
 namespace AuthenticationProvider.Clients;
 
+/// <summary>
+/// Client responsible for dispatching a reset password token to an external provider, 
+/// which then delivers it to the user via email. This client sends an HTTP request 
+/// containing the reset password token to the configured provider endpoint.
+/// </summary>
 public class ResetPasswordClient : IResetPasswordClient
 {
     private readonly HttpClient _httpClient;
@@ -12,34 +17,32 @@ public class ResetPasswordClient : IResetPasswordClient
 
     public ResetPasswordClient(HttpClient httpClient, IConfiguration configuration, ILogger<ResetPasswordClient> logger)
     {
-        _httpClient = httpClient;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _resetPasswordEndpoint = configuration["ResetPasswordProvider:Endpoint"]
-            ?? throw new ArgumentNullException("Endpoint is not configured.");
-        _logger = logger;
+            ?? throw new ArgumentNullException(nameof(configuration), "Reset password endpoint is not configured.");
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Sends a reset password email with the provided token.
+    /// Initializes a new instance of the <see cref="ResetPasswordClient"/> class.
     /// </summary>
-    /// <param name="token">The token used to identify the password reset request.</param>
-    /// <returns>True if the reset email was sent successfully, otherwise false.</returns>
+    /// <param name="httpClient">The HTTP client used to communicate with the external reset password provider.</param>
+    /// <param name="configuration">Configuration containing the endpoint URL for the reset password provider.</param>
+    /// <param name="logger">Logger for recording request attempts, warnings, and errors.</param>
     public async Task<bool> SendResetPasswordEmailAsync(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            _logger.LogWarning("Provided token is null or empty.");
+            _logger.LogWarning("Provided reset password token is null or empty.");
             return false;
         }
 
         try
         {
-            _logger.LogInformation("Preparing to send reset password email.");
+            _logger.LogInformation("Sending reset password request to {Endpoint}", _resetPasswordEndpoint);
 
-            // Create the payload for the request (token)
             var requestPayload = new { Token = token };
             var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
-
-            _logger.LogInformation("Sending request to ResetPasswordProvider endpoint: {Endpoint}", _resetPasswordEndpoint);
 
             var response = await _httpClient.PostAsync(_resetPasswordEndpoint, content);
 
@@ -48,23 +51,25 @@ public class ResetPasswordClient : IResetPasswordClient
                 _logger.LogInformation("Reset password email sent successfully.");
                 return true;
             }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Failed to send reset password email.");
-                return false;
-            }
+
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to send reset password email. Status Code: {StatusCode}, Response: {ErrorResponse}",
+                response.StatusCode, errorResponse);
+            return false;
         }
         catch (HttpRequestException httpEx)
         {
-            _logger.LogError(httpEx, "An error occurred while sending the reset password email.");
-            Console.WriteLine("Ett problem uppstod vid sändning av återställningsmejlet.");
+            _logger.LogError(httpEx, "HTTP request error while sending reset password email.");
+            return false;
+        }
+        catch (TaskCanceledException timeoutEx)
+        {
+            _logger.LogError(timeoutEx, "Request timed out while sending reset password email.");
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unexpected error occurred.");
-            Console.WriteLine("Ett oväntat fel inträffade.");
+            _logger.LogError(ex, "Unexpected error occurred while sending reset password email.");
             return false;
         }
     }

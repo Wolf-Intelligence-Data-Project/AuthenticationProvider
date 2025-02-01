@@ -1,11 +1,11 @@
 ﻿using AuthenticationProvider.Models.Responses;
 using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data;
-using AuthenticationProvider.Models.Data.Dtos;
 using AuthenticationProvider.Models.Data.Entities;
+using AuthenticationProvider.Models.Data.Requests;
 
 namespace AuthenticationProvider.Services;
 
@@ -37,7 +37,7 @@ public class SignInService : ISignInService
     /// </summary>
     /// <param name="signInDto">The sign-in request containing email and password.</param>
     /// <returns>A response indicating success or failure, including an access token if successful.</returns>
-    public async Task<SignInResponse> SignInAsync(SignInDto signInDto)
+    public async Task<SignInResponse> SignInAsync(SignInRequest signInDto)
     {
         if (signInDto == null)
         {

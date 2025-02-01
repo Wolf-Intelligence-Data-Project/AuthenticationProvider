@@ -7,15 +7,18 @@ using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Services;
 using AuthenticationProvider.Interfaces.Tokens;
-using AuthenticationProvider.Interfaces.Services.Security;
-using AuthenticationProvider.Models.Data.Dtos;
+using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Entities;
+using AuthenticationProvider.Models.Data.Requests;
 
 namespace AuthenticationProvider.Services;
 
+/// <summary>
+/// Service responsible for handling the sign-up process.
+/// </summary>
 public class SignUpService : ISignUpService
 {
     private readonly ICompanyRepository _companyRepository;
@@ -24,7 +27,7 @@ public class SignUpService : ISignUpService
     private readonly IAddressRepository _addressRepository;
     private readonly ILogger<SignUpService> _logger;
     private readonly PasswordHasher<CompanyEntity> _passwordHasher;
-    private readonly IEmailRestrictionService _emailRestrictionService; // Inject IEmailRestrictionService
+    private readonly IEmailRestrictionService _emailRestrictionService;
 
     public SignUpService(
         ICompanyRepository companyRepository,
@@ -32,7 +35,7 @@ public class SignUpService : ISignUpService
         IAccountVerificationService accountVerificationService,
         IAddressRepository addressRepository,
         ILogger<SignUpService> logger,
-        IEmailRestrictionService emailRestrictionService) // Injected through the constructor
+        IEmailRestrictionService emailRestrictionService)
     {
         _companyRepository = companyRepository;
         _accountVerificationTokenService = accountVerificationTokenService;
@@ -40,10 +43,10 @@ public class SignUpService : ISignUpService
         _addressRepository = addressRepository;
         _logger = logger;
         _passwordHasher = new PasswordHasher<CompanyEntity>();
-        _emailRestrictionService = emailRestrictionService; // Assigned here
+        _emailRestrictionService = emailRestrictionService;
     }
 
-    public async Task<SignUpResponse> RegisterCompanyAsync(SignUpDto request)
+    public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
     {
         ValidateSignUpRequest(request);
 
@@ -110,7 +113,7 @@ public class SignUpService : ISignUpService
         _logger.LogInformation($"Företaget med ID {companyId} har raderats.");
     }
 
-    private async Task AddAddressesAsync(SignUpDto request, CompanyEntity company)
+    private async Task AddAddressesAsync(SignUpRequest request, CompanyEntity company)
     {
         // Retrieve all existing addresses associated with the company once
         var existingAddresses = await _addressRepository.GetAddressesByCompanyIdAsync(company.Id);
@@ -182,7 +185,7 @@ public class SignUpService : ISignUpService
         }
     }
 
-    private void ValidateSignUpRequest(SignUpDto request)
+    private void ValidateSignUpRequest(SignUpRequest request)
     {
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);

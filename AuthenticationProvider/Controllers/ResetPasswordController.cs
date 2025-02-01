@@ -1,13 +1,12 @@
-﻿using AuthenticationProvider.Interfaces.Services.Security;
+﻿using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Interfaces.Tokens;
-using AuthenticationProvider.Models.Data.Dtos;
+using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
+
 using Microsoft.AspNetCore.Mvc;
 
-namespace AuthenticationProvider.Controllers;
-
 /// <summary>
-/// Controller responsible for handling password reset requests and operations.
+/// Controller responsible for managing password reset operations securely.
 /// </summary>
 [Route("api/[controller]")]
 [ApiController]
@@ -19,7 +18,7 @@ public class ResetPasswordController : ControllerBase
     private readonly string _frontendUrl;
 
     /// <summary>
-    /// Constructor for ResetPasswordController, initializing services and logging.
+    /// Initializes the controller with necessary services and configuration for password reset operations.
     /// </summary>
     public ResetPasswordController(
         IResetPasswordTokenService resetPasswordTokenService,
@@ -30,38 +29,28 @@ public class ResetPasswordController : ControllerBase
         _resetPasswordTokenService = resetPasswordTokenService ?? throw new ArgumentNullException(nameof(resetPasswordTokenService));
         _resetPasswordService = resetPasswordService ?? throw new ArgumentNullException(nameof(resetPasswordService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // Retrieve frontend URL from appsettings.json for redirection after successful token validation.
         _frontendUrl = configuration["FrontendUrl"];
     }
 
     /// <summary>
-    /// Endpoint to request a reset password token by providing an email address.
+    /// Initiates the password reset process by securely generating a token.
     /// </summary>
     [HttpPost("request-reset-password-token")]
     public async Task<IActionResult> RequestResetPasswordToken([FromBody] string email)
     {
-        if (string.IsNullOrEmpty(email))
+        if (!ModelState.IsValid)
         {
-            _logger.LogWarning("Email is required.");
-            return BadRequest(new
-            {
-                ErrorCode = "EMAIL_REQUIRED",
-                ErrorMessage = "E-postadress krävs.",
-                ErrorDetails = "Ingen e-postadress angavs för att begära återställning."
-            });
+            return BadRequest(ModelState);
         }
 
         try
         {
-            // Generate a reset password token for the provided email
             var resetPasswordToken = await _resetPasswordTokenService.CreateResetPasswordTokenAsync(email);
             if (string.IsNullOrEmpty(resetPasswordToken))
             {
                 return StatusCode(500, ErrorResponses.TokenGenerationFailed);
             }
 
-            // Send the reset password token to the user via email
             var emailSent = await _resetPasswordService.SendResetPasswordEmailAsync(resetPasswordToken);
             if (!emailSent)
             {
@@ -93,10 +82,10 @@ public class ResetPasswordController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint to complete the password reset process by providing a valid reset token and new password.
+    /// Completes the password reset by verifying the token and updating the password if valid.
     /// </summary>
     [HttpPost("reset-password/complete")]
-    public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordDto resetPasswordRequest)
+    public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
     {
         if (!ModelState.IsValid || resetPasswordRequest == null ||
             string.IsNullOrEmpty(resetPasswordRequest.Token) ||
@@ -106,7 +95,6 @@ public class ResetPasswordController : ControllerBase
             return BadRequest(ErrorResponses.InvalidInput);
         }
 
-        // Check if the new password matches the confirmation password
         if (resetPasswordRequest.NewPassword != resetPasswordRequest.ConfirmPassword)
         {
             return BadRequest(new
@@ -119,14 +107,12 @@ public class ResetPasswordController : ControllerBase
 
         try
         {
-            // Retrieve the email from the token
             var email = await _resetPasswordTokenService.GetEmailFromTokenAsync(resetPasswordRequest.Token);
             if (string.IsNullOrEmpty(email))
             {
                 return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
             }
 
-            // Reset the password using the provided token and new password
             var passwordResetSuccessful = await _resetPasswordService.ResetPasswordAsync(resetPasswordRequest);
             if (!passwordResetSuccessful)
             {
@@ -138,14 +124,12 @@ public class ResetPasswordController : ControllerBase
                 });
             }
 
-            // Validate that the reset password token is valid
             var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
             if (resetPasswordToken == null)
             {
                 return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
             }
 
-            // Mark the token as used
             await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id);
 
             return Ok(new { message = "Lösenordet har återställts framgångsrikt." });
@@ -168,8 +152,7 @@ public class ResetPasswordController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint for displaying the reset password page with a valid token.
-    /// Redirects the user to the frontend with the token attached for further processing.
+    /// Verifies the reset password token and redirects to the frontend for further processing.
     /// </summary>
     [HttpGet("reset-password")]
     public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
@@ -182,7 +165,6 @@ public class ResetPasswordController : ControllerBase
 
         try
         {
-            // Validate the token
             var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
             if (resetPasswordToken == null)
             {
@@ -206,8 +188,7 @@ public class ResetPasswordController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint to invalidate all reset password tokens for a specific company.
-    /// This is typically used for security reasons, such as when a company requests all tokens to be invalidated.
+    /// Revokes all active reset password tokens for a specified company for security purposes.
     /// </summary>
     [HttpPost("invalidate-reset-password-tokens/{companyId}")]
     public async Task<IActionResult> InvalidateResetPasswordTokens(Guid companyId)
@@ -219,7 +200,6 @@ public class ResetPasswordController : ControllerBase
 
         try
         {
-            // Invalidate all reset password tokens for the specified company
             await _resetPasswordTokenService.DeleteResetPasswordTokensForCompanyAsync(companyId);
             return Ok(new { message = "Alla återställningstoken för lösenord för det angivna företaget har ogiltigförklarats." });
         }

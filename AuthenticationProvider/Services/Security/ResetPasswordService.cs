@@ -4,9 +4,9 @@ using System;
 using System.Threading.Tasks;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Tokens;
-using AuthenticationProvider.Interfaces.Services.Security;
+using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Interfaces.Clients;
-using AuthenticationProvider.Models.Data.Dtos;
+using AuthenticationProvider.Models.Data.Requests;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -80,7 +80,7 @@ public class ResetPasswordService : IResetPasswordService
     /// </summary>
     /// <param name="resetPasswordRequest">The request containing the token and the new password.</param>
     /// <returns>True if the password is successfully reset; otherwise, false.</returns>
-    public async Task<bool> ResetPasswordAsync(ResetPasswordDto resetPasswordRequest)
+    public async Task<bool> ResetPasswordAsync(ResetPasswordRequest resetPasswordRequest)
     {
         if (string.IsNullOrWhiteSpace(resetPasswordRequest.Token) ||
             string.IsNullOrWhiteSpace(resetPasswordRequest.NewPassword) ||

@@ -1,9 +1,9 @@
-﻿using AuthenticationProvider.Models;
+﻿using AuthenticationProvider.Services.Utilities;
 using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Dtos;
+namespace AuthenticationProvider.Models.Data.Requests;
 
-public class SignUpDto
+public class SignUpRequest
 {
 
     [Required(ErrorMessage = "Organisationsnummer är obligatoriskt.")]
@@ -24,6 +24,7 @@ public class SignUpDto
 
     [Required(ErrorMessage = "Affärstyp är obligatorisk.")]
     [RegularExpression(@"^[A-ZÅÄÖ][a-zåäöA-ZÅÄÖ\s]*$", ErrorMessage = "Affärstyp får endast innehålla bokstäver och måste börja med en stor bokstav.")]
+    [ValidateBusinessType(ErrorMessage = "Ogiltig affärstyp. Vänligen välj en giltig affärstyp.")]
     public string BusinessType { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Ansvarig persons namn är obligatoriskt.")]
@@ -52,7 +53,7 @@ public class SignUpDto
     public string ConfirmPassword { get; set; } = null!;
 
     [Required(ErrorMessage = "Primär adress måste anges.")]
-    public AddressDto PrimaryAddress { get; set; } = null!;
+    public AddressRequest PrimaryAddress { get; set; } = null!;
 
-    public List<AddressDto>? AdditionalAddresses { get; set; }
+    public List<AddressRequest>? AdditionalAddresses { get; set; }
 }
