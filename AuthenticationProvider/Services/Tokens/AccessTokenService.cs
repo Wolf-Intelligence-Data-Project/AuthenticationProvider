@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data;
+using System.Collections.Generic;
 
 namespace AuthenticationProvider.Services.Tokens;
 
@@ -52,11 +53,11 @@ public class AccessTokenService : IAccessTokenService
         }
 
         var claims = new[] {
-        new Claim(ClaimTypes.Name, user.UserName),
-        new Claim("companyId", user.Id),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-        new Claim("isVerified", user.IsVerified.ToString().ToLower()),
-    };
+            new Claim(ClaimTypes.Name, user.UserName),
+            new Claim("companyId", user.Id),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("isVerified", user.IsVerified.ToString().ToLower()),
+        };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -71,11 +72,14 @@ public class AccessTokenService : IAccessTokenService
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        // Store the token in-memory with userId as the key
+        // Remove the old token without needing the out parameter
+        _tokenStore.TryRemove(user.Id, out _); // This is the correct method to remove the old token.
+
+        // Store the new token
         _tokenStore[user.Id] = tokenString;
 
         // Log the generated token for debugging purposes (optional)
-        _logger.LogInformation($"Generated token for user {user.UserName}: {tokenString}");
+        _logger.LogInformation($"Generated token for user {user.UserName}.");
 
         return tokenString;
     }
@@ -101,12 +105,12 @@ public class AccessTokenService : IAccessTokenService
     {
         try
         {
-            _logger.LogInformation($"Checking if token is blacklisted: {token}");
+            _logger.LogInformation($"Checking if token is blacklisted.");
 
             // Check if the token is blacklisted
             if (_blacklistedTokens.ContainsKey(token))
             {
-                _logger.LogWarning($"Token is blacklisted: {token}");
+                _logger.LogWarning($"Token is blacklisted.");
                 return false; // Token is blacklisted
             }
 
@@ -153,7 +157,7 @@ public class AccessTokenService : IAccessTokenService
                 _logger.LogInformation($"Revoked token for user {userId}: {token}");
 
                 // Remove the token from in-memory storage
-                _tokenStore.TryRemove(userId, out _);
+                _tokenStore.TryRemove(userId, out _); // Correct method to remove without requiring the out value.
             }
             else
             {

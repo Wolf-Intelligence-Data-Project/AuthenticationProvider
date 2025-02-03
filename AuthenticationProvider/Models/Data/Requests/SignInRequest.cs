@@ -10,5 +10,7 @@ public class SignInRequest
     [Required(ErrorMessage = "Ogiltiga inloggningsuppgifter.")]
     [DataType(DataType.Password)]
     public string Password { get; set; } = null!;
+
+    public string? CaptchaToken { get; set; }
 }
 

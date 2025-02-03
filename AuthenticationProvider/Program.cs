@@ -17,6 +17,7 @@ using AuthenticationProvider.Interfaces.Clients;
 using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Clients;
 using AuthenticationProvider.Interfaces.Utilities;
+using AuthenticationProvider.Interfaces.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +40,8 @@ builder.Services.AddScoped<IAccountVerificationTokenRepository, AccountVerificat
 builder.Services.AddScoped<IAccountVerificationTokenService, AccountVerificationTokenService>();
 builder.Services.AddScoped<IAccountVerificationService, AccountVerificationService>();
 builder.Services.AddScoped<IAccountVerificationClient, AccountVerificationClient>();
+builder.Services.AddHttpClient<ICaptchaVerificationService, CaptchaVerificationService>();
+
 
 builder.Services.AddScoped<IAccessTokenService, AccessTokenService>();
 

@@ -1,7 +1,10 @@
-﻿using AuthenticationProvider.Interfaces.Utilities;
+﻿using AuthenticationProvider.Interfaces.Security;
+using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
+using AuthenticationProvider.Services.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -14,15 +17,24 @@ public class AuthController : ControllerBase
 {
     private readonly ISignInService _signInService;
     private readonly ISignOutService _signOutService;
+    private readonly ICaptchaVerificationService _captchaService;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<AuthController> _logger;
+
+    private const int MaxFailedAttempts = 5;
+    private const int LockoutDurationMinutes = 3;
 
     public AuthController(
         ISignInService signInService,
         ISignOutService signOutService,
+        ICaptchaVerificationService captchaService,
+        IMemoryCache cache,
         ILogger<AuthController> logger)
     {
         _signInService = signInService ?? throw new ArgumentNullException(nameof(signInService));
         _signOutService = signOutService ?? throw new ArgumentNullException(nameof(signOutService));
+        _captchaService = captchaService ?? throw new ArgumentNullException(nameof(captchaService));
+        _cache = cache;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -41,16 +53,40 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ErrorResponses.ModelStateError);
+            return BadRequest("Ogiltiga data.");
+        }
+
+        // Define a cache key using the user email
+        var cacheKey = $"failed_attempts_{request.Email}";
+
+        // Fetch failed attempts from the cache. Default to 0 if not found.
+        var failedAttempts = _cache.Get<int>(cacheKey);
+
+        // If failed attempts exceed the limit, CAPTCHA verification is required
+        if (failedAttempts >= MaxFailedAttempts)
+        {
+            if (string.IsNullOrWhiteSpace(request.CaptchaToken))
+            {
+                return BadRequest("CAPTCHA krävs efter för många misslyckade försök.");
+            }
+
+            if (!await _captchaService.VerifyCaptchaAsync(request.CaptchaToken))
+            {
+                return BadRequest("Ogiltig CAPTCHA-verifiering.");
+            }
         }
 
         try
         {
+            // Attempt to sign in the user
             var response = await _signInService.SignInAsync(request);
 
             if (response.Success)
             {
-                _logger.LogInformation("Login successful for company: {CompanyEmail}", request.Email);
+                // Successful login, reset the failed attempts in the cache
+                _cache.Remove(cacheKey);
+                _logger.LogInformation("Inloggning lyckades för: {CompanyEmail}", request.Email);
+
                 return Ok(new
                 {
                     message = "Inloggning lyckades",
@@ -58,15 +94,28 @@ public class AuthController : ControllerBase
                 });
             }
 
-            _logger.LogWarning("Login failed for company: {CompanyEmail}. Invalid credentials.", request.Email);
-            return Unauthorized(ErrorResponses.InvalidCredentials);
+            // Increment failed attempts on failed login
+            failedAttempts++;
+
+            // Store the updated failed attempts back in cache, set an expiration
+            _cache.Set(cacheKey, failedAttempts, TimeSpan.FromMinutes(LockoutDurationMinutes));
+
+            // If failed attempts exceed the max limit, require CAPTCHA
+            if (failedAttempts >= MaxFailedAttempts)
+            {
+                return Unauthorized("För många försök. CAPTCHA krävs för nästa försök.");
+            }
+
+            _logger.LogWarning("Inloggning misslyckades för: {CompanyEmail}", request.Email);
+            return Unauthorized("Ogiltiga inloggningsuppgifter.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login attempt for company: {CompanyEmail}.", request.Email);
-            return StatusCode(500, ErrorResponses.GeneralError);
+            _logger.LogError(ex, "Fel vid inloggningsförsök för: {CompanyEmail}", request.Email);
+            return StatusCode(500, "Ett internt fel uppstod.");
         }
     }
+
 
     /// <summary>
     /// Endpoint to log out the company by invalidating the current session.
