@@ -2,7 +2,6 @@
 using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
-using AuthenticationProvider.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 

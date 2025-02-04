@@ -1,30 +1,22 @@
-﻿using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Interfaces.Tokens;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
+﻿using AuthenticationProvider.Interfaces.Tokens;
+using AuthenticationProvider.Interfaces.Utilities;
+using AuthenticationProvider.Models.Data;
 
 namespace AuthenticationProvider.Services;
 
-/// <summary>
-/// Service responsible for handling the sign-out process by removing tokens from memory cache.
-/// </summary>
 public class SignOutService : ISignOutService
 {
-    private readonly IMemoryCache _cache;
     private readonly IAccessTokenService _accessTokenService;
     private readonly ILogger<SignOutService> _logger;
 
-    public SignOutService(IMemoryCache cache, IAccessTokenService accessTokenService, ILogger<SignOutService> logger)
+    public SignOutService(IAccessTokenService accessTokenService, ILogger<SignOutService> logger)
     {
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _accessTokenService = accessTokenService ?? throw new ArgumentNullException(nameof(accessTokenService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Removes the specified token from the memory cache to complete the sign-out process.
+    /// Removes the specified token to complete the sign-out process.
     /// </summary>
     /// <param name="token">The token to be removed.</param>
     /// <returns>
@@ -41,13 +33,17 @@ public class SignOutService : ISignOutService
 
         try
         {
-            if (!_accessTokenService.IsTokenValid(token))
+            // Check if the token is valid and remove it
+            var userId = _accessTokenService.GetUserIdFromToken(token); // Retrieve the user from the token
+            if (string.IsNullOrEmpty(userId) || !_accessTokenService.IsTokenValid(token))
             {
                 _logger.LogInformation("Token is invalid or expired");
                 return false;
             }
 
-            _cache.Remove(token);
+            // Revoke the token
+            var user = new ApplicationUser { Id = userId }; // Assuming user has the Id property for matching
+            _accessTokenService.RevokeAccessToken(user); // Revoke token from service
 
             _logger.LogInformation("Token successfully removed during sign-out.");
             return true;

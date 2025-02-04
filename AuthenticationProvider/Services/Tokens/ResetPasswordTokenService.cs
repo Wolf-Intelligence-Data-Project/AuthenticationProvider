@@ -93,7 +93,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             {
                 Token = tokenString,
                 CompanyId = company.Id,
-                ExpiryDate = DateTime.UtcNow.AddHours(1),
+                ExpiryDate = DateTime.UtcNow.AddMinutes(15),
                 IsUsed = false
             };
 

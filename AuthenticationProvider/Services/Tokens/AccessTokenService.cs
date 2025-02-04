@@ -1,18 +1,18 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data;
-using System.Collections.Generic;
+using AuthenticationProvider.Models;
 
 namespace AuthenticationProvider.Services.Tokens;
 
+/// <summary>
+/// Service for managing access tokens for users. Includes generation, validation, and revocation of JWT tokens.
+/// NO REFRESH TOKEN. This website is not made for long or frequent sessions.
+/// </summary>
 public class AccessTokenService : IAccessTokenService
 {
     private readonly IConfiguration _configuration;
@@ -22,41 +22,51 @@ public class AccessTokenService : IAccessTokenService
     private static readonly ConcurrentDictionary<string, string> _tokenStore = new ConcurrentDictionary<string, string>();
 
     // In-memory blacklist for revoked tokens
-    private static readonly ConcurrentDictionary<string, bool> _blacklistedTokens = new ConcurrentDictionary<string, bool>();
+    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, BlacklistedToken>> _blacklistedTokens = new ConcurrentDictionary<string, ConcurrentDictionary<string, BlacklistedToken>>();
 
-    public AccessTokenService(
-        IConfiguration configuration,
-        ILogger<AccessTokenService> logger)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AccessTokenService"/> class.
+    /// </summary>
+    /// <param name="configuration">Application configuration for JWT settings.</param>
+    /// <param name="logger">Logger instance for logging events.</param>
+    public AccessTokenService(IConfiguration configuration, ILogger<AccessTokenService> logger)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Generates a new access token for the specified user.
+    /// </summary>
+    /// <param name="user">The user for whom the access token is being generated.</param>
+    /// <returns>A JWT access token as a string.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if the user is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if JWT configuration is invalid.</exception>
     public string GenerateAccessToken(ApplicationUser user)
     {
         if (user == null)
-            throw new ArgumentNullException(nameof(user), "Användaren finns inte.");
+            throw new ArgumentNullException(nameof(user), "User is not found.");
 
         var secretKey = _configuration["Jwt:Key"];
         var issuer = _configuration["Jwt:Issuer"];
         var audience = _configuration["Jwt:Audience"];
 
-        if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
+        if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
         {
-            throw new InvalidOperationException("Det gick inte att logga in.");
+            throw new InvalidOperationException("JWT configuration is missing.");
         }
 
-        // Ensure user.IsVerified is not null or false
+        // Ensure user is verified before proceeding
         if (user.IsVerified == null)
         {
-            _logger.LogWarning("The user is not verified.");
+            _logger.LogWarning("The user verification status is null.");
         }
 
         var claims = new[] {
             new Claim(ClaimTypes.Name, user.UserName),
             new Claim("companyId", user.Id),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("isVerified", user.IsVerified.ToString().ToLower()),
+            new Claim("isVerified", user.IsVerified.ToString().ToLower())
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -64,26 +74,31 @@ public class AccessTokenService : IAccessTokenService
 
         var token = new JwtSecurityToken(
             issuer: issuer,
-            audience: audience, // Set the audience
+            audience: audience,
             claims: claims,
-            expires: DateTime.Now.AddHours(1),
+            expires: DateTime.Now.AddHours(1), // Token expires in 1 hour
             signingCredentials: creds
         );
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        // Remove the old token without needing the out parameter
-        _tokenStore.TryRemove(user.Id, out _); // This is the correct method to remove the old token.
+        // Revoke the old token before issuing a new one
+        RevokeAccessToken(user); // Revoke the old token
 
-        // Store the new token
+        // Store the new token in memory
         _tokenStore[user.Id] = tokenString;
 
-        // Log the generated token for debugging purposes (optional)
-        _logger.LogInformation($"Generated token for user {user.UserName}.");
+        // Log the generation of the new token without revealing sensitive data
+        _logger.LogInformation($"Generated new access token for user {user.UserName}.");
 
         return tokenString;
     }
 
+    /// <summary>
+    /// Retrieves the user ID from a JWT token.
+    /// </summary>
+    /// <param name="token">The JWT token to extract the user ID from.</param>
+    /// <returns>The user ID associated with the token, or null if unable to parse.</returns>
     public string GetUserIdFromToken(string token)
     {
         try
@@ -101,6 +116,11 @@ public class AccessTokenService : IAccessTokenService
         }
     }
 
+    /// <summary>
+    /// Validates whether the specified token is valid and not blacklisted.
+    /// </summary>
+    /// <param name="token">The JWT token to validate.</param>
+    /// <returns>True if the token is valid, false if it is blacklisted or invalid.</returns>
     public bool IsTokenValid(string token)
     {
         try
@@ -136,37 +156,49 @@ public class AccessTokenService : IAccessTokenService
         }
     }
 
-    public void RevokeAccessToken(string token)
+    /// <summary>
+    /// Revokes the access token for the specified user by adding it to the blacklist and removing it from in-memory storage.
+    /// </summary>
+    /// <param name="user">The user whose access token is to be revoked.</param>
+    public void RevokeAccessToken(ApplicationUser user)
     {
         try
         {
-            // Check if the token is valid first before attempting to revoke
-            if (!IsTokenValid(token))
+            // Check if the user has an active token
+            if (_tokenStore.ContainsKey(user.Id))
             {
-                _logger.LogWarning($"Attempt to revoke an invalid token: {token}");
-                return;
-            }
+                var currentToken = _tokenStore[user.Id];
 
-            var userId = GetUserIdFromToken(token);
-            if (userId != null)
-            {
-                // Add the token to the blacklist to prevent further usage
-                _blacklistedTokens[token] = true;
+                // Define expiration time for the blacklisted token (30 minutes for this example)
+                var expirationTime = DateTime.UtcNow.AddMinutes(30);
 
-                // Log the revocation action for debugging purposes (optional)
-                _logger.LogInformation($"Revoked token for user {userId}: {token}");
+                // Ensure the blacklist for the user exists
+                if (!_blacklistedTokens.ContainsKey(user.Id))
+                {
+                    _blacklistedTokens[user.Id] = new ConcurrentDictionary<string, BlacklistedToken>();
+                }
+
+                // Blacklist the old token
+                _blacklistedTokens[user.Id][currentToken] = new BlacklistedToken
+                {
+                    Token = currentToken,
+                    ExpirationTime = expirationTime
+                };
 
                 // Remove the token from in-memory storage
-                _tokenStore.TryRemove(userId, out _); // Correct method to remove without requiring the out value.
+                _tokenStore.TryRemove(user.Id, out _);
+
+                // Log the revocation without revealing the token
+                _logger.LogInformation($"Revoked access token for user {user.UserName}.");
             }
             else
             {
-                _logger.LogWarning("Could not retrieve userId from token.");
+                _logger.LogWarning($"No active token found for user {user.UserName}.");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error revoking token: {ex.Message}");
+            _logger.LogError($"Error revoking token for user {user.UserName}: {ex.Message}");
         }
     }
 }
