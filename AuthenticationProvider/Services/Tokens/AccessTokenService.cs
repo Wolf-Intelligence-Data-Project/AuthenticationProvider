@@ -47,9 +47,9 @@ public class AccessTokenService : IAccessTokenService
         if (user == null)
             throw new ArgumentNullException(nameof(user), "User is not found.");
 
-        var secretKey = _configuration["Jwt:Key"];
-        var issuer = _configuration["Jwt:Issuer"];
-        var audience = _configuration["Jwt:Audience"];
+        var secretKey = _configuration["JwtAccess:Key"];
+        var issuer = _configuration["JwtAccess:Issuer"];
+        var audience = _configuration["JwtAccess:Audience"];
 
         if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
         {
@@ -139,10 +139,10 @@ public class AccessTokenService : IAccessTokenService
             {
                 ValidateAudience = true,
                 ValidateIssuer = true,
-                ValidIssuer = _configuration["Jwt:Issuer"],
-                ValidAudience = _configuration["Jwt:Audience"],
+                ValidIssuer = _configuration["JwtAccess:Issuer"],
+                ValidAudience = _configuration["JwtAccess:Audience"],
                 ValidateLifetime = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtAccess:Key"]))
             }, out _);
 
             // If validation passes, the token is valid
@@ -169,7 +169,7 @@ public class AccessTokenService : IAccessTokenService
             {
                 var currentToken = _tokenStore[user.Id];
 
-                // Define expiration time for the blacklisted token (30 minutes for this example)
+                // Expiration time for the blacklisted token
                 var expirationTime = DateTime.UtcNow.AddMinutes(30);
 
                 // Ensure the blacklist for the user exists

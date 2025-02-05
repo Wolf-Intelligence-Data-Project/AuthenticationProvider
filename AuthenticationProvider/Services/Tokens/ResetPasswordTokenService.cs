@@ -54,9 +54,9 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             await _resetPasswordTokenRepository.DeleteAsync(company.Id);
 
             // JWT configuration and validation
-            var secretKey = _configuration["Jwt:Key"];
-            var issuer = _configuration["Jwt:Issuer"];
-            var audience = _configuration["Jwt:Audience"];
+            var secretKey = _configuration["JwtResetPassword:Key"];
+            var issuer = _configuration["JwtResetPassword:Issuer"];
+            var audience = _configuration["JwtResetPassword:Audience"];
 
             if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer))
             {
@@ -91,9 +91,10 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             // Create the reset password token entity
             var resetPasswordToken = new ResetPasswordTokenEntity
             {
+
                 Token = tokenString,
                 CompanyId = company.Id,
-                ExpiryDate = DateTime.UtcNow.AddMinutes(15),
+                ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(15),
                 IsUsed = false
             };
 
@@ -222,9 +223,38 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
 
         try
         {
-            // Parse the token and validate it against stored records
-            var resetPasswordToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
-            return resetPasswordToken != null && !resetPasswordToken.IsUsed && resetPasswordToken.ExpiryDate >= DateTime.UtcNow;
+            var secretKey = _configuration["JwtResetPassword:Key"];
+            var issuer = _configuration["JwtResetPassword:Issuer"];
+            var audience = _configuration["JwtResetPassword:Audience"];
+
+            if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
+            {
+                throw new ArgumentNullException("JWT settings are missing in configuration.");
+            }
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidIssuer = issuer,
+                ValidAudience = audience,
+                IssuerSigningKey = securityKey
+            };
+
+            try
+            {
+                // Validate the JWT token
+                tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+                return true;
+            }
+            catch (SecurityTokenException ex)
+            {
+                _logger.LogWarning("Token validation failed: {Message}", ex.Message);
+                return false;
+            }
         }
         catch (Exception ex)
         {
@@ -232,4 +262,5 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             return false;
         }
     }
+
 }

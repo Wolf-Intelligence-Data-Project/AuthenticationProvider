@@ -62,9 +62,9 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         }
 
         // Generate a new JWT token
-        var secretKey = _configuration["Jwt:Key"];
-        var issuer = _configuration["Jwt:Issuer"];
-        var audience = _configuration["Jwt:Audience"];
+        var secretKey = _configuration["JwtVerification:Key"];
+        var issuer = _configuration["JwtVerification:Issuer"];
+        var audience = _configuration["JwtVerification:Audience"];
 
         if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
         {
@@ -82,7 +82,7 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
             new Claim(ClaimTypes.Email, company.Email),
             new Claim("token_type", "AccountVerification"),
         }),
-            Expires = DateTime.UtcNow.AddHours(1),
+            Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(30),
             Issuer = issuer,
             Audience = audience,
             SigningCredentials = credentials
@@ -116,9 +116,9 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         try
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var secretKey = _configuration["Jwt:Key"];
-            var issuer = _configuration["Jwt:Issuer"];
-            var audience = _configuration["Jwt:Audience"];
+            var secretKey = _configuration["JwtVerification:Key"];
+            var issuer = _configuration["JwtVerification:Issuer"];
+            var audience = _configuration["JwtVerification:Audience"];
 
             if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
             {
