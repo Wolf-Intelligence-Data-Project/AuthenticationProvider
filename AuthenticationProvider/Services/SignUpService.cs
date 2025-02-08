@@ -9,10 +9,10 @@ using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Services;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Interfaces.Services.Tokens;
 
 namespace AuthenticationProvider.Services;
 

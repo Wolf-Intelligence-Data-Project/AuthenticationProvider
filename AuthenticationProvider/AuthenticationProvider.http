@@ -1,1 +1,1 @@
-@AuthenticationProvider_HostAddress = http://localhost:5252
+@AuthenticationProvider_HostAddress = https://localhost:5252

@@ -11,13 +11,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using AuthenticationProvider.Repositories.Tokens;
 using AuthenticationProvider.Services.Security;
 using AuthenticationProvider.Services.Utilities;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Clients;
 using AuthenticationProvider.Models.Data;
-using AuthenticationProvider.Clients;
-using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Interfaces.Security;
+using AuthenticationProvider.Interfaces.Services.Tokens;
+using AuthenticationProvider.Interfaces.Services.Security.Clients;
+using AuthenticationProvider.Services.Security.Clients;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,6 +75,7 @@ builder.Services.AddHttpClient<AccountVerificationClient>(client =>
     var accountVerificationEndpoint = builder.Configuration.GetValue<string>("AccountVerificationProvider:Endpoint");
     client.BaseAddress = new Uri(accountVerificationEndpoint);
 });
+
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options =>
     {
@@ -89,27 +89,34 @@ builder.Services.AddAuthentication("Bearer")
             ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
             ValidAudience = builder.Configuration["JwtAccess:Audience"],
             ClockSkew = TimeSpan.Zero,
-
-            // Custom claim validation for token type
-            RoleClaimType = "TokenType"
         };
 
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
             {
-                var tokenType = context.Principal?.FindFirst("TokenType")?.Value;
-
-                // Example: Allow only specific token types
-                if (tokenType != "Access" && tokenType != "ResetPassword" && tokenType != "AccountVerification")
+                var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
+                if (isVerifiedClaim != "true")
                 {
-                    context.Fail("Invalid token type.");
+                    // If the claim is not true or not found, invalidate the token
+                    context.Fail("The account is not verified.");
                 }
-
+                return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+                var token = context.HttpContext.Request.Cookies["AccessToken"]; // Make sure the correct cookie is being used
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
                 return Task.CompletedTask;
             }
         };
     });
+
+// HttpOnly cookie for access token
+builder.Services.AddHttpContextAccessor();
 
 // Register IMemoryCache
 builder.Services.AddMemoryCache();
@@ -117,13 +124,13 @@ builder.Services.AddMemoryCache();
 // Register CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    options.AddPolicy("AllowAll", builder =>
+        builder.SetIsOriginAllowed(_ => true) // Allow any origin
+               .AllowAnyMethod()
+               .AllowAnyHeader()
+               .AllowCredentials());
 });
+
 
 // Add controllers
 builder.Services.AddControllers();
@@ -133,7 +140,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-
 // Enable Swagger UI in development environment
 if (app.Environment.IsDevelopment())
 {

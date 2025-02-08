@@ -1,12 +1,10 @@
-﻿using AuthenticationProvider.Interfaces.Clients;
-using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Tokens;
+﻿using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services.Security.Clients;
+using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Responses;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -45,6 +43,12 @@ public class AccountVerificationService : IAccountVerificationService
 
         try
         {
+            if (!await EmailValidation(token))
+            {
+                _logger.LogWarning("The email in the token does not match any company.");
+                return ServiceResult.EmailNotFound;
+            }
+
             var result = await _accountVerificationClient.SendVerificationEmailAsync(token);
             if (!result)
             {
@@ -69,20 +73,18 @@ public class AccountVerificationService : IAccountVerificationService
             return ServiceResult.InvalidToken;  // Return failure if token is invalid
         }
 
-        var claimsPrincipal = ValidateAccountVerificationToken(token);
-        if (claimsPrincipal == null)
+        // Extra check of the token before starting the process (where it checks again)
+        var accountVerificationToken = await _accountVerificationTokenService.GetValidAccountVerificationTokenAsync(token);
+        if (accountVerificationToken == null)
         {
-            return ServiceResult.InvalidToken;  // Token validation failed
+            _logger.LogWarning("The verification token is invalid.");
+            return ServiceResult.InvalidToken;  // Return failure if token is invalid
         }
 
-        var email = ExtractEmailFromToken(token);
-        if (string.IsNullOrEmpty(email))
-        {
-            _logger.LogWarning("Email not found in token.");
-            return ServiceResult.EmailNotFound;  // Return if email is not found
-        }
+        // Extract companyId from the accountVerificationToken
+        var companyId = accountVerificationToken.CompanyId;
 
-        var company = await _companyRepository.GetByEmailAsync(email);
+        var company = await _companyRepository.GetByIdAsync(companyId);  // Fetch the company using companyId
         if (company == null)
         {
             _logger.LogWarning("Company not found.");
@@ -98,75 +100,11 @@ public class AccountVerificationService : IAccountVerificationService
         company.IsVerified = true;
         await _companyRepository.UpdateAsync(company);  // Update the company as verified
 
-        if (!await RevokeTokenAsync(token))
-        {
-            return ServiceResult.InvalidToken;  // Handle revocation failure
-        }
+        // Mark the account verification token as used after the company is successfully verified
+        await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(token);
 
         _logger.LogInformation("Account verified successfully.");
         return ServiceResult.Success;  // Return success once everything is verified
-    }
-
-    private ClaimsPrincipal ValidateAccountVerificationToken(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes(_configuration["JwtVerification:Key"]);
-            var validationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidIssuer = _configuration["JwtVerification:Issuer"],
-                ValidAudience = _configuration["JwtVerification:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ClockSkew = TimeSpan.Zero  // No clock skew for immediate expiration checks
-            };
-
-            var claimsPrincipal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
-            return validatedToken is JwtSecurityToken ? claimsPrincipal : null;
-        }
-        catch (Exception ex) when (ex is SecurityTokenExpiredException || ex is SecurityTokenException)
-        {
-            _logger.LogWarning(ex, "Token validation failed.");
-            return null;  // Return null if token is invalid or expired
-        }
-    }
-
-    private string ExtractEmailFromToken(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var decodedToken = tokenHandler.ReadJwtToken(token);
-            return decodedToken?.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error extracting email from token.");
-            return null;  // Return null if extraction fails
-        }
-    }
-
-    private async Task<bool> RevokeTokenAsync(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            _logger.LogWarning("Token is null or empty.");
-            return false;  // Return false if the token is invalid
-        }
-
-        try
-        {
-            await _accountVerificationTokenRepository.RevokeAndDeleteByTokenAsync(token);  // Revoke and delete the token
-            return true;  // Return true if revocation was successful
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error revoking the token.");
-            return false;  // Return false if revocation failed
-        }
     }
 
     public async Task<ServiceResult> ResendVerificationEmailAsync(string email)
@@ -174,7 +112,7 @@ public class AccountVerificationService : IAccountVerificationService
         if (string.IsNullOrEmpty(email))
         {
             _logger.LogWarning("No email provided for resending verification email.");
-            return ServiceResult.Failure;  // Use Failure property directly
+            return ServiceResult.Failure;
         }
 
         try
@@ -217,5 +155,49 @@ public class AccountVerificationService : IAccountVerificationService
         }
     }
 
+    private async Task<bool> EmailValidation(string token)
+    {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var jwtToken = tokenHandler.ReadJwtToken(token);
 
+            // Log all claims for debugging (optional)
+            foreach (var claim in jwtToken.Claims)
+            {
+                _logger.LogInformation($"Claim: {claim.Type} = {claim.Value}");
+            }
+
+            // Extract the email claim from the token
+            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrEmpty(emailClaim))
+            {
+                _logger.LogWarning("No email claim found in the token.");
+                return false;
+            }
+
+            // Check if a company exists with the extracted email
+            var company = await _companyRepository.GetByEmailAsync(emailClaim);
+            if (company == null)
+            {
+                _logger.LogWarning("No company found with the email from the token.");
+                return false;
+            }
+
+            // Check if the company is already verified (optional)
+            if (company.IsVerified)
+            {
+                _logger.LogInformation("The company is already verified.");
+                return false; // If already verified, return false or handle as needed
+            }
+
+            return true; // Email claim exists, matches a company, and company is not verified yet
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while validating email from token.");
+            return false;
+        }
+    }
 }

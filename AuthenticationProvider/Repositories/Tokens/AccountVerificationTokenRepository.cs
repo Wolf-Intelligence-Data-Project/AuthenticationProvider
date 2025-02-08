@@ -2,7 +2,6 @@
 using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Models.Data.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace AuthenticationProvider.Repositories.Tokens;
 

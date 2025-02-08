@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Interfaces.Services.Tokens;
 
 namespace AuthenticationProvider.Services;
 
@@ -37,9 +37,9 @@ public class SignInService : ISignInService
     /// </summary>
     /// <param name="signInDto">The sign-in request containing email and password.</param>
     /// <returns>A response indicating success or failure, including an access token if successful.</returns>
-    public async Task<SignInResponse> SignInAsync(SignInRequest signInDto)
+    public async Task<SignInResponse> SignInAsync(SignInRequest signInRequest)
     {
-        if (signInDto == null)
+        if (signInRequest == null)
         {
             _logger.LogWarning("SignInDto is null.");
             return new SignInResponse
@@ -49,7 +49,7 @@ public class SignInService : ISignInService
             };
         }
 
-        if (string.IsNullOrWhiteSpace(signInDto.Email) || string.IsNullOrWhiteSpace(signInDto.Password))
+        if (string.IsNullOrWhiteSpace(signInRequest.Email) || string.IsNullOrWhiteSpace(signInRequest.Password))
         {
             _logger.LogWarning("Sign-in failed: Email or password is empty.");
             return new SignInResponse
@@ -62,7 +62,7 @@ public class SignInService : ISignInService
         try
         {
             // Retrieve the company by email
-            var companyEntity = await _companyRepository.GetByEmailAsync(signInDto.Email);
+            var companyEntity = await _companyRepository.GetByEmailAsync(signInRequest.Email);
             if (companyEntity == null)
             {
                 _logger.LogWarning("Sign-in failed: Company not found for provided email.");
@@ -77,7 +77,7 @@ public class SignInService : ISignInService
             var applicationUser = MapToApplicationUser(companyEntity);
 
             // Validate password
-            if (!ValidatePassword(applicationUser, signInDto.Password))
+            if (!ValidatePassword(applicationUser, signInRequest.Password))
             {
                 _logger.LogWarning("Sign-in failed: Invalid credentials for the provided email.");
                 return new SignInResponse
@@ -87,16 +87,15 @@ public class SignInService : ISignInService
                 };
             }
 
-            // Generate access token upon successful authentication
+            // Generate access token and store in HTTP-only cookie
             var token = _accessTokenService.GenerateAccessToken(applicationUser);
 
             _logger.LogInformation("Company signed in successfully.");
             return new SignInResponse
             {
                 Success = true,
-                Token = token,
                 Message = "Inloggning lyckades.",
-                User = applicationUser
+                User = applicationUser // You may exclude the user if you only rely on the cookie
             };
         }
         catch (Exception ex)
@@ -109,6 +108,7 @@ public class SignInService : ISignInService
             };
         }
     }
+
 
     /// <summary>
     /// Maps a <see cref="CompanyEntity"/> to an <see cref="ApplicationUser"/> model.

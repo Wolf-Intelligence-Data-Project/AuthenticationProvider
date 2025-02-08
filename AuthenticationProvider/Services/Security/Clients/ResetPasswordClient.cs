@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Interfaces.Clients;
+﻿using AuthenticationProvider.Interfaces.Services.Security.Clients;
 using Newtonsoft.Json;
 using System.Text;
 
-namespace AuthenticationProvider.Clients;
+namespace AuthenticationProvider.Services.Security.Clients;
 
 /// <summary>
 /// Client responsible for dispatching a reset password token to an external provider, 

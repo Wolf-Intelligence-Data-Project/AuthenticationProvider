@@ -1,4 +1,4 @@
-﻿namespace AuthenticationProvider.Interfaces.Clients;
+﻿namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
 
 /// <summary>
 /// Defines a contract for an external client responsible for sending 

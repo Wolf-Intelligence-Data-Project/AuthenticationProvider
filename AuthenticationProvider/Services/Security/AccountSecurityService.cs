@@ -1,10 +1,11 @@
 ﻿using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses;
 using Microsoft.AspNetCore.Identity;
+using Newtonsoft.Json.Linq;
+using AuthenticationProvider.Interfaces.Services.Tokens;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -52,12 +53,21 @@ public class AccountSecurityService : IAccountSecurityService
                 return false; // Bad request: restricted email
             }
 
-            // Validate the provided token for authenticity
-            if (!_accessTokenService.IsTokenValid(emailChangeRequest.Token))
+            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(emailChangeRequest.Token); // Retrieve authentication and verification status
+
+            if (!isAuthenticated)
             {
-                _logger.LogWarning("Invalid token during email change.");
-                return false; // Unauthorized: invalid token
+                _logger.LogInformation("Token is invalid or expired");
+                return false;  // Token is invalid or expired
             }
+
+            // Optionally, check if the token is verified if needed
+            if (!isAccountVerified)
+            {
+                _logger.LogInformation("Account is not verified");
+                return false; 
+            }
+
 
             // Extract company ID from the token
             var companyIdString = _accessTokenService.GetUserIdFromToken(emailChangeRequest.Token);
@@ -136,12 +146,21 @@ public class AccountSecurityService : IAccountSecurityService
 
         try
         {
-            // Validate the token (same process as email change)
-            if (!_accessTokenService.IsTokenValid(passwordChangeRequest.Token))
+            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(passwordChangeRequest.Token); // Retrieve authentication and verification status
+
+            if (!isAuthenticated)
             {
-                _logger.LogWarning("Invalid token during password change.");
-                return false; // Unauthorized: invalid token
+                _logger.LogInformation("Token is invalid or expired");
+                return false;  // Token is invalid or expired
             }
+
+            // Optionally, check if the token is verified if needed
+            if (!isAccountVerified)
+            {
+                _logger.LogInformation("Token is not verified");
+                return false;  // Token is not verified
+            }
+
 
             // Extract company ID from the token
             var companyIdString = _accessTokenService.GetUserIdFromToken(passwordChangeRequest.Token);

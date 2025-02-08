@@ -1,8 +1,8 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
+using AuthenticationProvider.Interfaces.Services.Tokens;
 
 namespace AuthenticationProvider.Controllers;
 

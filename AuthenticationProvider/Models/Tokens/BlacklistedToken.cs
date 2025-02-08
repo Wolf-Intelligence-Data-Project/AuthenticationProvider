@@ -1,11 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace AuthenticationProvider.Models;
+﻿namespace AuthenticationProvider.Models.Tokens;
 
 public class BlacklistedToken
 {
-    [Required]
     public string Token { get; set; } = string.Empty;
-    [Required]
     public DateTime ExpirationTime { get; set; }
 }

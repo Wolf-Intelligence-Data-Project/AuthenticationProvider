@@ -2,7 +2,7 @@
 using AuthenticationProvider.Models.Data.Requests;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AuthenticationProvider.Interfaces.Tokens;
+namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
 /// <summary>
 /// Provides methods for managing account verification tokens for companies.
@@ -26,7 +26,7 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="request">The request containing the token to be validated.</param>
     /// <returns>A response indicating whether the token is valid or expired, along with appropriate status codes.</returns>
-    Task<IActionResult> ValidateAccountVerificationTokenAsync(TokenRequest request);
+    Task<IActionResult> ValidateAccountVerificationTokenAsync(string token);
 
     /// <summary>
     /// Marks the specified account verification token as used. Once marked, the token can no longer be used for verification.
@@ -43,12 +43,4 @@ public interface IAccountVerificationTokenService
     /// <param name="token">The token to be retrieved for validation.</param>
     /// <returns>A task representing the asynchronous operation, with the account verification token entity if valid, otherwise null.</returns>
     Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token);
-
-    /// <summary>
-    /// Deletes all account verification tokens associated with a specific company.
-    /// This operation ensures that there are no lingering or unused tokens for the company.
-    /// </summary>
-    /// <param name="companyId">The unique identifier of the company whose tokens should be deleted.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task DeleteAccountVerificationTokensForCompanyAsync(Guid companyId);
 }

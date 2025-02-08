@@ -1,8 +1,6 @@
 ﻿using AuthenticationProvider.Models.Data.Entities;
-using System;
-using System.Threading.Tasks;
 
-namespace AuthenticationProvider.Interfaces.Tokens;
+namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
 public interface IResetPasswordTokenService
 {
@@ -10,11 +8,8 @@ public interface IResetPasswordTokenService
 
     Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token);
 
-    Task<string> GetEmailFromTokenAsync(string token);
+    Task<bool> ValidateResetPasswordTokenAsync(string token);
 
     Task MarkResetPasswordTokenAsUsedAsync(Guid tokenId);
 
-    Task DeleteResetPasswordTokensForCompanyAsync(Guid companyId);
-
-    Task<bool> ValidateResetPasswordTokenAsync(string token);
 }

@@ -1,9 +1,11 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
-
 using Microsoft.AspNetCore.Mvc;
+using AuthenticationProvider.Interfaces.Services.Tokens;
+
+namespace AuthenticationProvider.Controllers;
+
 
 /// <summary>
 /// Controller responsible for managing password reset operations securely.
@@ -82,76 +84,6 @@ public class ResetPasswordController : ControllerBase
     }
 
     /// <summary>
-    /// Completes the password reset by verifying the token and updating the password if valid.
-    /// </summary>
-    [HttpPost("reset-password/complete")]
-    public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
-    {
-        if (!ModelState.IsValid || resetPasswordRequest == null ||
-            string.IsNullOrEmpty(resetPasswordRequest.Token) ||
-            string.IsNullOrEmpty(resetPasswordRequest.NewPassword) ||
-            string.IsNullOrEmpty(resetPasswordRequest.ConfirmPassword))
-        {
-            return BadRequest(ErrorResponses.InvalidInput);
-        }
-
-        if (resetPasswordRequest.NewPassword != resetPasswordRequest.ConfirmPassword)
-        {
-            return BadRequest(new
-            {
-                ErrorCode = "PASSWORD_MISMATCH",
-                ErrorMessage = "Lösenord och bekräfta lösenord matchar inte.",
-                ErrorDetails = "Var vänlig och ange samma lösenord i båda fälten."
-            });
-        }
-
-        try
-        {
-            var email = await _resetPasswordTokenService.GetEmailFromTokenAsync(resetPasswordRequest.Token);
-            if (string.IsNullOrEmpty(email))
-            {
-                return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
-            }
-
-            var passwordResetSuccessful = await _resetPasswordService.ResetPasswordAsync(resetPasswordRequest);
-            if (!passwordResetSuccessful)
-            {
-                return StatusCode(500, new
-                {
-                    ErrorCode = "PASSWORD_RESET_FAILED",
-                    ErrorMessage = "Misslyckades med att uppdatera lösenordet.",
-                    ErrorDetails = "Försök igen senare eller kontakta support."
-                });
-            }
-
-            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
-            if (resetPasswordToken == null)
-            {
-                return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
-            }
-
-            await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id);
-
-            return Ok(new { message = "Lösenordet har återställts framgångsrikt." });
-        }
-        catch (ArgumentNullException ex)
-        {
-            _logger.LogError(ex, "ArgumentNullException while resetting password.");
-            return BadRequest(ErrorResponses.MissingParameter);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex, "InvalidOperationException while resetting password.");
-            return StatusCode(500, ErrorResponses.InternalServerError);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while resetting password.");
-            return StatusCode(500, ErrorResponses.GeneralInternalError(ex));
-        }
-    }
-
-    /// <summary>
     /// Verifies the reset password token and redirects to the frontend for further processing.
     /// </summary>
     [HttpGet("reset-password")]
@@ -160,6 +92,14 @@ public class ResetPasswordController : ControllerBase
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("Reset password link clicked without a token.");
+            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
+        }
+
+        // Extra check of the token before starting a process (where it checks again)
+        var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(token);
+        if (!isTokenValid)
+        {
+            _logger.LogWarning("Account verification token is invalid, used, or expired.");
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
@@ -188,25 +128,45 @@ public class ResetPasswordController : ControllerBase
     }
 
     /// <summary>
-    /// Revokes all active reset password tokens for a specified company for security purposes.
+    /// Completes the password reset by verifying the token and updating the password if valid.
     /// </summary>
-    [HttpPost("invalidate-reset-password-tokens/{companyId}")]
-    public async Task<IActionResult> InvalidateResetPasswordTokens(Guid companyId)
+    [HttpPost("reset-password/complete")]
+    public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
     {
-        if (companyId == Guid.Empty)
+        if (!ModelState.IsValid || resetPasswordRequest == null)
         {
-            return BadRequest(ErrorResponses.CompanyNotFound);
+            return BadRequest(ErrorResponses.MissingParameter);
+        }
+
+        // Extra check of the token before starting a process (where it checks again)
+        var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetPasswordRequest.Token);
+        if (!isTokenValid)
+        {
+            _logger.LogWarning("Account verification token is invalid, used, or expired.");
+            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
         try
         {
-            await _resetPasswordTokenService.DeleteResetPasswordTokensForCompanyAsync(companyId);
-            return Ok(new { message = "Alla återställningstoken för lösenord för det angivna företaget har ogiltigförklarats." });
+            // Call service method to handle password reset logic
+            var success = await _resetPasswordService.ResetPasswordAsync(resetPasswordRequest);
+
+            if (!success)
+            {
+                return BadRequest(new
+                {
+                    ErrorCode = "PASSWORD_RESET_FAILED",
+                    ErrorMessage = "Failed to reset password.",
+                    ErrorDetails = "Please try again later or contact support."
+                });
+            }
+
+            return Ok(new { message = "Password has been reset successfully." });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while invalidating reset password tokens.");
-            return StatusCode(500, ErrorResponses.TokenInvalidationError);
+            _logger.LogError(ex, "Error while resetting password.");
+            return StatusCode(500, ErrorResponses.GeneralInternalError(ex));
         }
     }
 }

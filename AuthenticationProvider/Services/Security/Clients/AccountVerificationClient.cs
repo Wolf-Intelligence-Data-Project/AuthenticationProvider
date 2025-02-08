@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
-using AuthenticationProvider.Interfaces.Clients;
+using AuthenticationProvider.Interfaces.Services.Security.Clients;
 
-namespace AuthenticationProvider.Clients;
+namespace AuthenticationProvider.Services.Security.Clients;
 
 /// <summary>
 /// Handles dispatching account verification tokens to an external service responsible for sending emails to users.

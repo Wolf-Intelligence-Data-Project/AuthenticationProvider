@@ -1,10 +1,11 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Repositories;
+using AuthenticationProvider.Interfaces.Services.Tokens;
+
 namespace AuthenticationProvider.Controllers;
 
 /// <summary>
@@ -32,7 +33,11 @@ public class AccountVerificationController : ControllerBase
         _accountVerificationService = accountVerificationService;
         _companyRepository = companyRepository;
         _logger = logger;
-        _frontendUrl = configuration["VerificationSuccess"];
+        _frontendUrl = configuration["VerificationSuccess"]!;
+        if (string.IsNullOrWhiteSpace(_frontendUrl))
+        {
+            _logger.LogError("Frontend URL for verification success is not configured.");
+        }
     }
 
     /// <summary>
@@ -46,9 +51,9 @@ public class AccountVerificationController : ControllerBase
     /// - 500 Internal Server Error: If an error occurred while sending the email.
     /// </returns>
     [HttpPost("send-verification-email")]
-    public async Task<IActionResult> SendVerificationEmail([FromBody] TokenRequest request)
+    public async Task<IActionResult> SendVerificationEmail([FromBody] string token)
     {
-        if (string.IsNullOrWhiteSpace(request.Token))
+        if (string.IsNullOrWhiteSpace(token))
         {
             _logger.LogWarning("Token is missing for the send verification email request.");
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
@@ -56,7 +61,7 @@ public class AccountVerificationController : ControllerBase
 
         try
         {
-            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(request.Token);
+            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
             if (emailSent != ServiceResult.Success)
             {
                 _logger.LogError("Failed to send verification email.");
@@ -93,11 +98,11 @@ public class AccountVerificationController : ControllerBase
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
-        // Validate the account verification token
-        var result = await _accountVerificationTokenService.ValidateAccountVerificationTokenAsync(new TokenRequest { Token = token });
-        if (result is UnauthorizedObjectResult || result is BadRequestObjectResult)
+        // Extra check of the token before starting a process (where it checks again)
+        var isTokenValid = await _accountVerificationTokenService.ValidateAccountVerificationTokenAsync(token);
+        if (isTokenValid is UnauthorizedObjectResult || isTokenValid is BadRequestObjectResult)
         {
-            return result;  // Return error response if token is invalid or expired
+            return isTokenValid; 
         }
 
         try
@@ -106,9 +111,22 @@ public class AccountVerificationController : ControllerBase
             var verificationResult = await _accountVerificationService.VerifyEmailAsync(token);
 
             // Handle different verification result outcomes
+            if (verificationResult == ServiceResult.Success)
+            {
+                // Attempt to redirect to the frontend, if available
+                try
+                {
+                    return Redirect(_frontendUrl);
+                }
+                catch
+                {
+                    // If redirect fails, show success message with login instructions
+                    return Ok("Kontot har verifierats framgångsrikt. Du kan nu logga in.");
+                }
+            }
+
             return verificationResult switch
             {
-                ServiceResult.Success => Redirect(_frontendUrl),  // Redirect to frontend on success
                 ServiceResult.InvalidToken => BadRequest(ErrorResponses.TokenExpiredOrInvalid),  // Invalid token
                 ServiceResult.EmailNotFound => NotFound(ErrorResponses.EmailNotFound),  // Email not found
                 ServiceResult.CompanyNotFound => NotFound(ErrorResponses.CompanyNotFound),  // Company not found
@@ -123,6 +141,7 @@ public class AccountVerificationController : ControllerBase
             return StatusCode(500, ErrorResponses.GeneralError);
         }
     }
+
 
     /// <summary>
     /// Resends the verification email to the provided email address if it has not been verified yet.

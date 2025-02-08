@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Interfaces.Tokens;
+﻿using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Models.Data;
 
@@ -33,20 +33,30 @@ public class SignOutService : ISignOutService
 
         try
         {
-            // Check if the token is valid and remove it
-            var userId = _accessTokenService.GetUserIdFromToken(token); // Retrieve the user from the token
-            if (string.IsNullOrEmpty(userId) || !_accessTokenService.IsTokenValid(token))
+            // Check if the token is valid and retrieve the authentication and verification statuses
+            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token); // Retrieve authentication and verification status
+
+            // Log if token is invalid or expired, but allow sign-out regardless
+            if (!isAuthenticated)
             {
-                _logger.LogInformation("Token is invalid or expired");
-                return false;
+                _logger.LogInformation("Token is invalid or expired, proceeding with sign-out.");
             }
+
+            // Optionally, log if the token is not verified but proceed with sign-out
+            if (!isAccountVerified)
+            {
+                _logger.LogInformation("Token is not verified, proceeding with sign-out.");
+            }
+
+            // You can still revoke the token even if it's invalid or expired
+            var userId = _accessTokenService.GetUserIdFromToken(token); // Get userId from token if possible
 
             // Revoke the token
             var user = new ApplicationUser { Id = userId }; // Assuming user has the Id property for matching
-            _accessTokenService.RevokeAccessToken(user); // Revoke token from service
+            await _accessTokenService.RevokeAndBlacklistAccessToken(user); // Revoke token from service
 
             _logger.LogInformation("Token successfully removed during sign-out.");
-            return true;
+            return true;  // Return true as token revocation was successful
         }
         catch (Exception ex)
         {

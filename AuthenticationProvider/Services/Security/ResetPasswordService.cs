@@ -1,12 +1,12 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
 using AuthenticationProvider.Interfaces.Repositories;
-using AuthenticationProvider.Interfaces.Tokens;
 using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Interfaces.Clients;
 using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Responses;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using AuthenticationProvider.Interfaces.Services.Tokens;
+using AuthenticationProvider.Interfaces.Services.Security.Clients;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -46,9 +46,15 @@ public class ResetPasswordService : IResetPasswordService
 
         try
         {
+            if (!await EmailValidation(token))
+            {
+                _logger.LogWarning("The email in the token does not match any company.");
+                return false;
+            }
+
             // Validate the token
-            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
-            if (resetPasswordToken == null)
+            var resetPasswordToken = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(token);
+            if (!resetPasswordToken)
             {
                 _logger.LogWarning("Reset password token is invalid or expired.");
                 return false;
@@ -98,6 +104,7 @@ public class ResetPasswordService : IResetPasswordService
 
         try
         {
+
             // Validate the reset password token
             var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
             if (resetPasswordToken == null)
@@ -138,4 +145,57 @@ public class ResetPasswordService : IResetPasswordService
             return false;
         }
     }
+    private async Task<bool> EmailValidation(string token)
+    {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var jwtToken = tokenHandler.ReadJwtToken(token);
+
+            // Log all claims for debugging
+            foreach (var claim in jwtToken.Claims)
+            {
+                _logger.LogInformation($"Claim: {claim.Type} = {claim.Value}");
+            }
+
+            // Extract the email claim from the token
+            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrEmpty(emailClaim))
+            {
+                _logger.LogWarning("No email claim found in the token.");
+                return false;
+            }
+
+            // Check if the email exists in the company database
+            var company = await _companyRepository.GetByEmailAsync(emailClaim);
+            if (company == null)
+            {
+                _logger.LogWarning("No company found with the email from the token.");
+                return false;
+            }
+
+            // Compare the email from the token with the company's email
+            if (!company.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("The email in the token does not match the company's email.");
+                return false;
+            }
+
+            // Check token expiration
+            if (jwtToken.ValidTo < TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")))
+            {
+                _logger.LogWarning("The token has expired.");
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while validating email from token.");
+            return false;
+        }
+    }
+
 }

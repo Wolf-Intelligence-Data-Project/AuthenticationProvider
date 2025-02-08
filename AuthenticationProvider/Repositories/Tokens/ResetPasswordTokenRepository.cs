@@ -26,7 +26,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         try
         {
             return await _context.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > DateTime.UtcNow && !t.IsUsed);
+                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")) && !t.IsUsed);
         }
         catch (Exception ex)
         {
@@ -45,7 +45,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         try
         {
             return await _context.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > DateTime.UtcNow && !t.IsUsed);
+                .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")) && !t.IsUsed);
         }
         catch (Exception ex)
         {
