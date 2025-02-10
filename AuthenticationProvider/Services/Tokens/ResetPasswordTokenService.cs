@@ -30,7 +30,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         _passwordHasher = new PasswordHasher<CompanyEntity>();
     }
 
-    public async Task<string> CreateResetPasswordTokenAsync(string email)
+    public async Task<string> GenerateResetPasswordTokenAsync(string email)
     {
         try
         {

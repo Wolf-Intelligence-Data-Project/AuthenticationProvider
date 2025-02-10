@@ -130,7 +130,7 @@ public class AccountVerificationService : IAccountVerificationService
             await _companyRepository.UpdateAsync(company);
 
             // Generate a new account verification token for the company
-            var newToken = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
+            var newToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(company.Id);
             if (string.IsNullOrEmpty(newToken))
             {
                 _logger.LogError("Failed to create a new verification token for company with email: {Email}", email);

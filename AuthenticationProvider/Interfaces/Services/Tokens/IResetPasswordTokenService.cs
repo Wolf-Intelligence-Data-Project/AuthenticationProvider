@@ -4,7 +4,7 @@ namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
 public interface IResetPasswordTokenService
 {
-    Task<string> CreateResetPasswordTokenAsync(string email);
+    Task<string> GenerateResetPasswordTokenAsync(string email);
 
     Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token);
 

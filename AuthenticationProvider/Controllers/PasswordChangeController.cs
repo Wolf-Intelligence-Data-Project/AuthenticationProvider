@@ -1,6 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthenticationProvider.Controllers;
@@ -8,8 +9,10 @@ namespace AuthenticationProvider.Controllers;
 /// <summary>
 /// Controller responsible for handling password change requests and operations.
 /// </summary>
+[Authorize(Policy = "AccessToken")]
 [Route("api/[controller]")]
 [ApiController]
+
 public class PasswordChangeController : ControllerBase
 {
     private readonly IAccountSecurityService _accountSecurityService;

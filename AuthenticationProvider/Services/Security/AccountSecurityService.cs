@@ -102,7 +102,7 @@ public class AccountSecurityService : IAccountSecurityService
             await _companyRepository.UpdateAsync(company);
 
             // Generate a new verification token and send verification email
-            var verificationToken = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(companyId);
+            var verificationToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(companyId);
             var tokenResult = await _accountVerificationService.SendVerificationEmailAsync(verificationToken);
 
             if (tokenResult != ServiceResult.Success)

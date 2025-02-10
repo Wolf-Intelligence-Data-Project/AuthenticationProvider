@@ -84,7 +84,7 @@ public class SignUpService : ISignUpService
         await AddAddressesAsync(request, company);
 
         // Generate an account verification token
-        var token = await _accountVerificationTokenService.CreateAccountVerificationTokenAsync(company.Id);
+        var token = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(company.Id);
 
         // Send the verification email
         var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);

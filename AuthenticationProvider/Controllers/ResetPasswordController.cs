@@ -3,6 +3,7 @@ using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -47,7 +48,7 @@ public class ResetPasswordController : ControllerBase
 
         try
         {
-            var resetPasswordToken = await _resetPasswordTokenService.CreateResetPasswordTokenAsync(email);
+            var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
             if (string.IsNullOrEmpty(resetPasswordToken))
             {
                 return StatusCode(500, ErrorResponses.TokenGenerationFailed);
@@ -86,6 +87,7 @@ public class ResetPasswordController : ControllerBase
     /// <summary>
     /// Verifies the reset password token and redirects to the frontend for further processing.
     /// </summary>
+    [Authorize(Policy = "ResetPasswordToken")]
     [HttpGet("reset-password")]
     public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
     {
@@ -130,6 +132,7 @@ public class ResetPasswordController : ControllerBase
     /// <summary>
     /// Completes the password reset by verifying the token and updating the password if valid.
     /// </summary>
+    [Authorize(Policy = "ResetPasswordToken")]
     [HttpPost("reset-password/complete")]
     public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
     {

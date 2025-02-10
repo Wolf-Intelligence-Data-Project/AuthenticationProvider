@@ -76,44 +76,121 @@ builder.Services.AddHttpClient<AccountVerificationClient>(client =>
     client.BaseAddress = new Uri(accountVerificationEndpoint);
 });
 
-builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtAccess:Key"])),
-            ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
-            ValidAudience = builder.Configuration["JwtAccess:Audience"],
-            ClockSkew = TimeSpan.Zero,
-        };
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
 
-        options.Events = new JwtBearerEvents
+// Access Token Authentication (Default)
+.AddJwtBearer("Bearer", options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtAccess:Key"])),
+        ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
+        ValidAudience = builder.Configuration["JwtAccess:Audience"],
+        ClockSkew = TimeSpan.Zero,
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
         {
-            OnTokenValidated = context =>
+            var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
+            if (isVerifiedClaim != "true")
             {
-                var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
-                if (isVerifiedClaim != "true")
-                {
-                    // If the claim is not true or not found, invalidate the token
-                    context.Fail("The account is not verified.");
-                }
-                return Task.CompletedTask;
-            },
-            OnMessageReceived = context =>
-            {
-                var token = context.HttpContext.Request.Cookies["AccessToken"]; // Make sure the correct cookie is being used
-                if (!string.IsNullOrEmpty(token))
-                {
-                    context.Token = token;
-                }
-                return Task.CompletedTask;
+                context.Fail("The account is not verified.");
             }
-        };
-    });
+            return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            var token = context.HttpContext.Request.Cookies["AccessToken"];
+            if (!string.IsNullOrEmpty(token))
+            {
+                context.Token = token;
+            }
+            return Task.CompletedTask;
+        }
+    };
+})
+
+// Reset Password Token Authentication
+.AddJwtBearer("ResetPassword", options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtResetPassword:Key"])),
+        ValidIssuer = builder.Configuration["JwtResetPassword:Issuer"],
+        ValidAudience = builder.Configuration["JwtResetPassword:Audience"],
+        ClockSkew = TimeSpan.Zero,
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+            if (tokenType != "ResetPassword")
+            {
+                context.Fail("Invalid reset password token.");
+            }
+            return Task.CompletedTask;
+        }
+    };
+})
+
+// Account Verification Token Authentication
+.AddJwtBearer("AccountVerification", options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtVerification:Key"])),
+        ValidIssuer = builder.Configuration["JwtVerification:Issuer"],
+        ValidAudience = builder.Configuration["JwtVerification:Audience"],
+        ClockSkew = TimeSpan.Zero,
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+            if (tokenType != "AccountVerification")
+            {
+                context.Fail("Invalid account verification token.");
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+// Add Authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAccessToken", policy =>
+        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("Bearer"));
+
+    options.AddPolicy("RequireResetPasswordToken", policy =>
+        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("ResetPassword"));
+
+    options.AddPolicy("RequireAccountVerificationToken", policy =>
+        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerification"));
+});
+
 
 // HttpOnly cookie for access token
 builder.Services.AddHttpContextAccessor();
@@ -125,7 +202,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
-        builder.SetIsOriginAllowed(_ => true) // Allow any origin
+        builder.SetIsOriginAllowed(_ => true)
                .AllowAnyMethod()
                .AllowAnyHeader()
                .AllowCredentials());

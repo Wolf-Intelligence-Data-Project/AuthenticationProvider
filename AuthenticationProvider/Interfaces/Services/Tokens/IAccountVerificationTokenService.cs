@@ -18,7 +18,7 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="companyId">The unique identifier of the company requesting verification.</param>
     /// <returns>A string representing the generated token.</returns>
-    Task<string> CreateAccountVerificationTokenAsync(Guid companyId);
+    Task<string> GenerateAccountVerificationTokenAsync(Guid companyId);
 
     /// <summary>
     /// Validates the provided account verification token to ensure it is legitimate and not expired.

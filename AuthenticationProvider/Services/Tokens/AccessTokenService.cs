@@ -14,11 +14,11 @@ public class AccessTokenService : IAccessTokenService
     private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AccessTokenService> _logger;
-    private readonly IMemoryCache _memoryCache; // Inject MemoryCache
+    private readonly IMemoryCache _memoryCache;
 
-    // In-memory storage for access tokens using MemoryCache
     private static readonly string TokenCacheKey = "AccessToken_"; // Prefix for the cache key
     private static readonly string BlacklistCacheKey = "Blacklist_"; // Prefix for the blacklist cache key
+    private static readonly string IpCacheKey = "IpAddress_";
 
     public AccessTokenService(IConfiguration configuration, ILogger<AccessTokenService> logger, IHttpContextAccessor httpContextAccessor, IMemoryCache memoryCache)
     {
@@ -28,12 +28,13 @@ public class AccessTokenService : IAccessTokenService
         _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
     }
 
+    #region Main Methods
+
     public string GenerateAccessToken(ApplicationUser user)
     {
         if (user == null)
             throw new ArgumentNullException(nameof(user), "User is not found.");
 
-        // Ensure old token is revoked before generating a new one
         RevokeAndBlacklistAccessToken(user).Wait();
 
         var secretKey = _configuration["JwtAccess:Key"];
@@ -43,8 +44,7 @@ public class AccessTokenService : IAccessTokenService
         if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
             throw new InvalidOperationException("JWT configuration is missing.");
 
-        var claims = new[]
-        {
+        var claims = new[] {
             new Claim(ClaimTypes.Name, user.UserName),
             new Claim("companyId", user.Id),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
@@ -58,44 +58,28 @@ public class AccessTokenService : IAccessTokenService
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddHours(1),
+            expires: DateTime.UtcNow.AddHours(1),
             signingCredentials: creds
         );
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        // Store token in MemoryCache
-        _memoryCache.Set(TokenCacheKey + user.Id, tokenString, TimeSpan.FromMinutes(20)); // Set expiration time
+        _memoryCache.Set(TokenCacheKey + user.Id, tokenString, TimeSpan.FromHours(1));
 
-        // Set HTTP-only cookie
+        var userIpInfo = GetUserIp();
+        _memoryCache.Set(IpCacheKey + user.Id, userIpInfo.IpAddress, TimeSpan.FromHours(1)); // Store IP for 1 hour
+
         _httpContextAccessor.HttpContext?.Response?.Cookies.Append("AccessToken", tokenString, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.None,
-            Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddHours(1)
+            Expires = DateTime.UtcNow.AddHours(1)
         });
 
         _logger.LogInformation($"Generated new access token for user {user.UserName}.");
 
         return tokenString;
-    }
-
-    public string GetUserIdFromToken(string token)
-    {
-        try
-        {
-            var handler = new JwtSecurityTokenHandler();
-            var jsonToken = handler.ReadToken(token) as JwtSecurityToken;
-
-            var companyIdClaim = jsonToken?.Claims.FirstOrDefault(c => c.Type == "companyId");
-            return companyIdClaim?.Value;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error decoding token: {ex.Message}");
-            return null;
-        }
     }
 
     public (bool isAuthenticated, bool isAccountVerified) ValidateAccessToken(string token = null)
@@ -107,15 +91,14 @@ public class AccessTokenService : IAccessTokenService
             if (string.IsNullOrEmpty(token))
             {
                 _logger.LogWarning("No token provided.");
-                return (false, false);  // No token means not authenticated, and not verified
+                return (false, false);
             }
 
-            // Check token expiration, blacklisting, and validation
             var isTokenValid = CheckBlacklist(token);
             if (!isTokenValid)
             {
                 _logger.LogWarning("Token is expired, invalid, or blacklisted.");
-                return (false, false);  // Token is invalid
+                return (false, false);
             }
 
             var handler = new JwtSecurityTokenHandler();
@@ -132,26 +115,34 @@ public class AccessTokenService : IAccessTokenService
 
             var principal = handler.ValidateToken(token, validationParameters, out _);
 
-            // Check if the token contains the "isVerified" claim and whether the user is verified
             var isAccountVerified = principal.Claims.FirstOrDefault(c => c.Type == "isVerified")?.Value == "true";
             if (!isAccountVerified)
             {
                 _logger.LogWarning("Token user is not verified.");
-                return (false, false);  // Not verified
+                return (false, false);
+            }
+
+            var storedIp = _memoryCache.Get<string>(IpCacheKey + principal.Identity.Name);
+            var currentIp = GetUserIp().IpAddress;
+
+            if (storedIp != "Unknown IP" && storedIp != currentIp)
+            {
+                _logger.LogWarning("IP address mismatch. Token validation failed.");
+                return (false, false);
             }
 
             _logger.LogInformation("Token is valid and user is verified.");
-            return (true, true);  // Token is valid and user is verified
+            return (true, true);
         }
         catch (SecurityTokenException ex)
         {
             _logger.LogWarning("Token validation failed: {Message}", ex.Message);
-            return (false, false);  // Return false if token validation failed
+            return (false, false);
         }
         catch (Exception ex)
         {
             _logger.LogError($"Unexpected error during token validation: {ex.Message}");
-            return (false, false);  // Return false on other errors
+            return (false, false);
         }
     }
 
@@ -184,6 +175,9 @@ public class AccessTokenService : IAccessTokenService
                 // Remove the token from the active token cache
                 _memoryCache.Remove(tokenKey);
 
+                // Remove the IP address from cache as well
+                _memoryCache.Remove(IpCacheKey + user.Id);
+
                 _logger.LogInformation($"Token for user {user.UserName} revoked and added to blacklist.");
 
                 // Clear the cookie to invalidate the session
@@ -209,29 +203,53 @@ public class AccessTokenService : IAccessTokenService
         }
     }
 
+    #endregion
+
+    #region Helper Methods
+
+    // Helper method to get the user's IP and User-Agent
+    public UserIpInfo GetUserIp()
+    {
+        var ipAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "Unknown IP";
+        var userAgent = _httpContextAccessor.HttpContext?.Request?.Headers["User-Agent"].ToString() ?? "Unknown User-Agent";
+
+        return new UserIpInfo
+        {
+            IpAddress = ipAddress,
+            UserAgent = userAgent
+        };
+    }
+
+    public string GetUserIdFromToken(string token)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jsonToken = handler.ReadToken(token) as JwtSecurityToken;
+
+            var companyIdClaim = jsonToken?.Claims.FirstOrDefault(c => c.Type == "companyId");
+            return companyIdClaim?.Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error decoding token: {ex.Message}");
+            return null;
+        }
+    }
+
     private bool CheckBlacklist(string token)
     {
-        // Check if the token is blacklisted
         if (_memoryCache.TryGetValue(BlacklistCacheKey + token, out BlacklistedToken blacklistedToken))
         {
-            if (blacklistedToken.ExpirationTime > TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")))
+            if (blacklistedToken.ExpirationTime > DateTime.UtcNow)
             {
                 _logger.LogWarning("Token is blacklisted.");
                 return false;  // Token is blacklisted
             }
-
-            // Remove expired blacklisted token
             _memoryCache.Remove(BlacklistCacheKey + token);
         }
-        try
-        {
-            _logger.LogInformation("Token is not blacklisted.");
-            return true;  // Token is valid
-        }
-        catch (SecurityTokenException ex)
-        {
-            _logger.LogWarning($"Token validation failed: {ex.Message}");
-            return false;  // Token is invalid
-        }
+        return true;  // Token is valid
     }
+
+    #endregion
 }

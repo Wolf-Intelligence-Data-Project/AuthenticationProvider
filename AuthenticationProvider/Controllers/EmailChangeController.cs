@@ -3,6 +3,7 @@ using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -10,8 +11,10 @@ namespace AuthenticationProvider.Controllers;
 /// Controller responsible for handling secure email change requests and operations for authenticated users.
 /// Ensures that only authorized users can request email changes.
 /// </summary>
+[Authorize(Policy = "AccessToken")]
 [Route("api/[controller]")]
 [ApiController]
+
 public class EmailChangeController : ControllerBase
 {
     private readonly IAccessTokenService _accessTokenService;

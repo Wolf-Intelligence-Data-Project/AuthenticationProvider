@@ -29,7 +29,7 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         _logger = logger;
     }
 
-    public async Task<string> CreateAccountVerificationTokenAsync(Guid companyId)
+    public async Task<string> GenerateAccountVerificationTokenAsync(Guid companyId)
     {
         // Check if the company exists
         var company = await _companyRepository.GetByIdAsync(companyId);

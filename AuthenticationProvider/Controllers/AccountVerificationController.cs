@@ -5,6 +5,7 @@ using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -50,6 +51,7 @@ public class AccountVerificationController : ControllerBase
     /// - 400 Bad Request: If the token is missing or invalid.
     /// - 500 Internal Server Error: If an error occurred while sending the email.
     /// </returns>
+    [Authorize(Policy = "AccountVerificationToken")]
     [HttpPost("send-verification-email")]
     public async Task<IActionResult> SendVerificationEmail([FromBody] string token)
     {
@@ -88,6 +90,7 @@ public class AccountVerificationController : ControllerBase
     /// - 404 Not Found: If the account or company is not found.
     /// - 500 Internal Server Error: If an error occurs during the verification process.
     /// </returns>
+    [Authorize(Policy = "AccountVerificationToken")]
     [HttpGet("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromQuery] string token)
     {
