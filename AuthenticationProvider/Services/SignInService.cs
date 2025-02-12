@@ -109,7 +109,6 @@ public class SignInService : ISignInService
         }
     }
 
-
     /// <summary>
     /// Maps a <see cref="CompanyEntity"/> to an <see cref="ApplicationUser"/> model.
     /// </summary>

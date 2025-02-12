@@ -1,66 +1,47 @@
-﻿using AuthenticationProvider.Interfaces.Utilities;
+﻿using AuthenticationProvider.Models.Enums;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 
 namespace AuthenticationProvider.Controllers;
 
 /// <summary>
-/// Controller responsible for handling business types (used for dropdown menu in frontend).
+/// Controller for retrieving business types as an enumerable list.
+/// This endpoint provides a list of available business types, including 
+/// their string values and display names. It is used in frontend for dropdown (signup / non-signed user)
 /// </summary>
 [Route("api/[controller]")]
 [ApiController]
 public class BusinessTypeController : ControllerBase
 {
-    private readonly IBusinessTypeService _businessTypeService;
-    private readonly ILogger<BusinessTypeController> _logger;
-
-    public BusinessTypeController(IBusinessTypeService businessTypeService, ILogger<BusinessTypeController> logger)
-    {
-        _businessTypeService = businessTypeService ?? throw new ArgumentNullException(nameof(businessTypeService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
     /// <summary>
-    /// Retrieves a list of all available business types for use in frontend dropdown menus.
-    /// Each business type is represented by an integer value and its corresponding display name.
+    /// Retrieves a list of business types.
     /// </summary>
-    /// <returns>A list of business types, each containing an integer value and a display name.</returns>
+    /// <returns>A list of business types with their values and display names.</returns>
     [HttpGet]
     public IActionResult GetBusinessTypes()
     {
-        try
-        {
-            // Fetch business types from the service
-            var businessTypes = _businessTypeService.GetBusinessTypes();
-
-            if (businessTypes == null || businessTypes.Count == 0)
+        var businessTypes = Enum.GetValues(typeof(BusinessTypeEnum))
+            .Cast<BusinessTypeEnum>()
+            .Select(e => new
             {
-                // Log warning if no business types found
-                _logger.LogWarning("No business types found.");
+                Value = e.ToString(),  // Get the string name of the enum
+                DisplayName = GetEnumDisplayName(e)  // DisplayName from the DisplayAttribute
+            })
+            .ToList();
 
-                // Return a 404 Not Found if no business types were found
-                return NotFound(new 
-                {
-                    ErrorCode = "RESOURCE_NOT_FOUND",
-                    ErrorMessage = "Inga företagskategorier hittades.",
-                    ErrorDetails = "Det finns inga tillgängliga företagskategorier i systemet."
-                });
-            }
+        return Ok(businessTypes);
+    }
 
-            // Return business types as a JSON response
-            return Ok(businessTypes);
-        }
-        catch (Exception ex)
-        {
-            // Log the exception for debugging and monitoring
-            _logger.LogError(ex, "Error occurred while retrieving business types.");
-
-            // Return 500 Internal Server Error if an error occurs
-            return StatusCode(500, new
-            {
-                ErrorCode = "BUSINESS_TYPE_FETCH_FAILED",
-                ErrorMessage = "Ett fel inträffade vid hämtning av företagskategorier.",
-                ErrorDetails = "Ett oväntat fel inträffade när företagskategorier hämtades."
-            });
-        }
+    /// <summary>
+    /// Retrieves the display name of a given business type.
+    /// </summary>
+    /// <param name="businessTypeEnum">The business type enum value.</param>
+    /// <returns>The display name if available; otherwise, the enum name.</returns>
+    private string GetEnumDisplayName(BusinessTypeEnum businessTypeEnum)
+    {
+        var fieldInfo = businessTypeEnum.GetType().GetField(businessTypeEnum.ToString());
+        var attribute = fieldInfo.GetCustomAttribute<DisplayAttribute>();
+        return attribute?.Name ?? businessTypeEnum.ToString(); // fallback to enum name
     }
 }

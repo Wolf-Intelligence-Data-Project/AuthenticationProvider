@@ -33,4 +33,7 @@ public interface IAccessTokenService
     /// </summary>
     /// <param name="user">The user whose access token is to be revoked.</param>
     Task RevokeAndBlacklistAccessToken(ApplicationUser user);
+
+    // Method for cleaning up expired tokens
+    void CleanUpExpiredTokens();
 }

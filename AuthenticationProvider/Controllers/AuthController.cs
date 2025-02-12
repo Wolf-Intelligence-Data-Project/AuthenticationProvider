@@ -8,7 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace AuthenticationProvider.Controllers;
 
 /// <summary>
-/// Controller responsible for handling authentication (sign up and sign in) requests and operations.
+/// Handles authentication operations such as login, logout, and checking authentication status.
 /// </summary>
 [Route("api/[controller]")]
 [ApiController]
@@ -24,16 +24,13 @@ public class AuthController : ControllerBase
     private const int MaxFailedAttempts = 5;
     private const int LockoutDurationMinutes = 3;
 
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
     public AuthController(
         ISignInService signInService,
         ISignOutService signOutService,
         IAccessTokenService accessTokenService,
         ICaptchaVerificationService captchaService,
         IMemoryCache cache,
-        ILogger<AuthController> logger,
-        IHttpContextAccessor httpContextAccessor) // Add IHttpContextAccessor here
+        ILogger<AuthController> logger)
     {
         _signInService = signInService ?? throw new ArgumentNullException(nameof(signInService));
         _signOutService = signOutService ?? throw new ArgumentNullException(nameof(signOutService));
@@ -41,19 +38,17 @@ public class AuthController : ControllerBase
         _captchaService = captchaService ?? throw new ArgumentNullException(nameof(captchaService));
         _cache = cache;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor)); // Initialize the field
     }
 
     /// <summary>
-    /// Endpoint to log in a company by authenticating using the provided credentials.
-    /// Returns a token on successful authentication.
+    /// Authenticates a company using the provided credentials and returns an access token upon success.
     /// </summary>
-    /// <param name="request">The credentials to authenticate the company.</param>
-    /// <returns>Returns an authentication token if authentication is successful.</returns>
-    /// <response code="200">If authentication is successful, returns the authentication token.</response>
-    /// <response code="400">If the provided credentials are invalid or the model state is incorrect.</response>
-    /// <response code="401">If authentication fails due to invalid credentials.</response>
-    /// <response code="500">If an error occurs during authentication.</response>
+    /// <param name="request">The sign-in request containing login credentials.</param>
+    /// <returns>Returns a success message if authentication succeeds, otherwise an error response.</returns>
+    /// <response code="200">Authentication successful.</response>
+    /// <response code="400">Invalid input data.</response>
+    /// <response code="401">Authentication failed due to incorrect credentials.</response>
+    /// <response code="500">Internal server error during authentication.</response>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] SignInRequest request)
     {
@@ -85,10 +80,9 @@ public class AuthController : ControllerBase
             if (response.Success)
             {
                 _cache.Remove(cacheKey);
-                _logger.LogInformation("Inloggning lyckades för: {CompanyEmail}", request.Email);
+                _logger.LogInformation("Login successful for: {CompanyEmail}", request.Email);
 
-                // The token is already stored in the cookie inside GenerateAccessToken
-                return Ok(new { message = "Inloggning lyckades" }); // No need to return token
+                return Ok(new { message = "Inloggning lyckades." });
             }
 
             failedAttempts++;
@@ -99,25 +93,23 @@ public class AuthController : ControllerBase
                 return Unauthorized("För många försök. CAPTCHA krävs för nästa försök.");
             }
 
-            _logger.LogWarning("Inloggning misslyckades för: {CompanyEmail}", request.Email);
+            _logger.LogWarning("Login failed for: {CompanyEmail}", request.Email);
             return Unauthorized("Ogiltiga inloggningsuppgifter.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fel vid inloggningsförsök för: {CompanyEmail}", request.Email);
+            _logger.LogError(ex, "Error during login attempt for: {CompanyEmail}", request.Email);
             return StatusCode(500, "Ett internt fel uppstod.");
         }
     }
 
-
     /// <summary>
-    /// Endpoint to log out the company by invalidating the current session.
-    /// If a token is provided, it will be revoked.
+    /// Logs out the currently authenticated company by revoking the access token.
     /// </summary>
-    /// <param name="Authorization">Authorization header containing the Bearer token (optional).</param>
-    /// <returns>Returns a success message on successful logout.</returns>
+    /// <returns>Returns a success message upon successful logout.</returns>
     /// <response code="200">Logout successful.</response>
-    /// <response code="400">Bad request if the token is invalid or there is an issue during logout.</response>
+    /// <response code="400">Access token is missing.</response>
+    /// <response code="500">Internal server error during logout.</response>
     [HttpDelete("logout")]
     public async Task<IActionResult> Logout()
     {
@@ -125,43 +117,43 @@ public class AuthController : ControllerBase
 
         if (string.IsNullOrEmpty(token))
         {
-            return BadRequest(new { message = "Access token is missing." });
+            return BadRequest(new { message = "Åtkomsttoken saknas." });
         }
 
         var signOutSuccess = await _signOutService.SignOutAsync(token);
 
         if (!signOutSuccess)
         {
-            return StatusCode(500, new { message = "Logout failed due to an internal error." });
+            _logger.LogError("Logout failed due to an internal error.");
+            return StatusCode(500, new { message = "Utloggning misslyckades på grund av ett internt fel." });
         }
 
-        // Clear the HttpOnly cookie by setting an expiration date in the past
         Response.Cookies.Append("AccessToken", "", new CookieOptions
         {
-            Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddDays(-1), // Expire the cookie
-            HttpOnly = true,                       // Ensure it's HttpOnly
-            Secure = true,                         // Secure if using HTTPS
-            SameSite = SameSiteMode.Strict,        // SameSite setting
+            Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddDays(-1),
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
         });
 
-        // No need to clear cookie here again, it's handled by RevokeAccessToken.
-        return Ok(new { message = "Logged out successfully." });
+        _logger.LogInformation("User successfully logged out.");
+        return Ok(new { message = "Utloggning lyckades." });
     }
 
     /// <summary>
-    /// Endpoint to check the login status of the company based on the current authentication token.
+    /// Checks the authentication status of the currently logged-in company.
     /// </summary>
-    /// <returns>Returns a success message if the company is authenticated, or an error if not.</returns>
-    /// <response code="200">If the company is authenticated.</response>
-    /// <response code="401">If the company is not authenticated.</response>
+    /// <returns>Returns authentication and verification status.</returns>
+    /// <response code="200">Returns authentication status.</response>
+    /// <response code="400">Access token is missing.</response>
     [HttpGet("status")]
     public IActionResult GetAuthStatus()
     {
-        var token = Request.Cookies["AccessToken"];  // Get the JWT from the HttpOnly cookie
+        var token = Request.Cookies["AccessToken"];
 
         if (string.IsNullOrEmpty(token))
         {
-            return BadRequest(new { message = "Access token is missing." });
+            return BadRequest(new { message = "Åtkomsttoken saknas." });
         }
 
         var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token);

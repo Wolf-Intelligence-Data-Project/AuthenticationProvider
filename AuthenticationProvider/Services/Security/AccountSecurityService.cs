@@ -4,7 +4,6 @@ using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses;
 using Microsoft.AspNetCore.Identity;
-using Newtonsoft.Json.Linq;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 
 namespace AuthenticationProvider.Services.Security;
@@ -18,15 +17,17 @@ public class AccountSecurityService : IAccountSecurityService
     private readonly ILogger<AccountSecurityService> _logger;
     private readonly PasswordHasher<CompanyEntity> _passwordHasher;
     private readonly IEmailRestrictionService _emailRestrictionService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AccountSecurityService(
-        ICompanyRepository companyRepository,
-        IAccessTokenService accessTokenService,
-        IAccountVerificationTokenService accountVerificationTokenService,
-        IAccountVerificationService accountVerificationService,
-        ILogger<AccountSecurityService> logger,
-        IConfiguration configuration,
-        IEmailRestrictionService emailRestrictionService)
+    ICompanyRepository companyRepository,
+    IAccessTokenService accessTokenService,
+    IAccountVerificationTokenService accountVerificationTokenService,
+    IAccountVerificationService accountVerificationService,
+    ILogger<AccountSecurityService> logger,
+    IConfiguration configuration,
+    IEmailRestrictionService emailRestrictionService,
+    IHttpContextAccessor httpContextAccessor)  // Add this line
     {
         _companyRepository = companyRepository;
         _accessTokenService = accessTokenService;
@@ -35,6 +36,7 @@ public class AccountSecurityService : IAccountSecurityService
         _logger = logger;
         _passwordHasher = new PasswordHasher<CompanyEntity>();
         _emailRestrictionService = emailRestrictionService;
+        _httpContextAccessor = httpContextAccessor;  // Assign the injected IHttpContextAccessor
     }
 
     /// <summary>
@@ -46,43 +48,59 @@ public class AccountSecurityService : IAccountSecurityService
     {
         try
         {
-            // Validate email restrictions - prevent restricted email addresses
-            if (_emailRestrictionService.IsRestrictedEmail(emailChangeRequest.Email))
+            // Ensure valid request parameters
+            if (string.IsNullOrWhiteSpace(emailChangeRequest.Email) ||
+                string.IsNullOrWhiteSpace(emailChangeRequest.CurrentPassword))
             {
-                _logger.LogWarning("Email change request denied for a restricted email.");
-                return false; // Bad request: restricted email
+                _logger.LogWarning("Invalid email change request.");
+                return false; // Bad request: missing required fields
             }
 
-            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(emailChangeRequest.Token); // Retrieve authentication and verification status
+            // Get token from the cookie (you no longer send it explicitly in the request)
+            var token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"];
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No token found in cookies.");
+                return false; // No token in cookies
+            }
+
+            // Validate token: ensure it is authenticated and the account is verified
+            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token);
 
             if (!isAuthenticated)
             {
-                _logger.LogInformation("Token is invalid or expired");
-                return false;  // Token is invalid or expired
+                _logger.LogInformation("Token is invalid or expired.");
+                return false;
             }
 
-            // Optionally, check if the token is verified if needed
             if (!isAccountVerified)
             {
-                _logger.LogInformation("Account is not verified");
-                return false; 
+                _logger.LogInformation("Account is not verified.");
+                return false;
             }
 
-
-            // Extract company ID from the token
-            var companyIdString = _accessTokenService.GetUserIdFromToken(emailChangeRequest.Token);
+            // Get the company ID from the token
+            var companyIdString = _accessTokenService.GetUserIdFromToken(token);
             if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
             {
                 _logger.LogWarning("Unable to retrieve or parse company ID from token.");
-                return false; // Bad request: invalid company ID
+                return false;
             }
 
-            // Retrieve the company entity by ID
+            // Fetch the company from the database
             var company = await _companyRepository.GetByIdAsync(companyId);
             if (company == null)
             {
                 _logger.LogWarning("Company not found for email change.");
-                return false; // Not found: company does not exist
+                return false;
+            }
+
+            // Verify the current password before allowing email change
+            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(company, company.PasswordHash, emailChangeRequest.CurrentPassword);
+            if (passwordVerificationResult == PasswordVerificationResult.Failed)
+            {
+                _logger.LogWarning("Current password is incorrect.");
+                return false;
             }
 
             // Check if the new email is already in use
@@ -90,14 +108,11 @@ public class AccountSecurityService : IAccountSecurityService
             if (existingCompany != null)
             {
                 _logger.LogWarning("Email is already in use.");
-                return false; // Conflict: email already exists
+                return false;
             }
 
             // Set the company as unverified before changing the email
             company.IsVerified = false;
-            await _companyRepository.UpdateAsync(company);
-
-            // Update the company's email
             company.Email = emailChangeRequest.Email;
             await _companyRepository.UpdateAsync(company);
 
@@ -108,16 +123,16 @@ public class AccountSecurityService : IAccountSecurityService
             if (tokenResult != ServiceResult.Success)
             {
                 _logger.LogWarning("Failed to send account verification email.");
-                return false; // Internal Server Error: failure in email sending
+                return false;
             }
 
             _logger.LogInformation("Email successfully changed and verification email sent.");
-            return true; // Success: email changed and verification sent
+            return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error during email change: {ex.Message}");
-            return false; // Internal Server Error: exception occurred
+            _logger.LogError(ex, "An error occurred while changing the email.");
+            return false;
         }
     }
 
@@ -129,66 +144,83 @@ public class AccountSecurityService : IAccountSecurityService
     public async Task<bool> ChangePasswordAsync(PasswordChangeRequest passwordChangeRequest)
     {
         // Ensure valid request parameters
-        if (string.IsNullOrWhiteSpace(passwordChangeRequest.Token) ||
-            string.IsNullOrWhiteSpace(passwordChangeRequest.Password) ||
+        if (
+            string.IsNullOrWhiteSpace(passwordChangeRequest.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(passwordChangeRequest.NewPassword) ||
             string.IsNullOrWhiteSpace(passwordChangeRequest.ConfirmPassword))
         {
             _logger.LogWarning("Invalid password change request.");
             return false; // Bad request: missing password fields
         }
 
-        // Ensure that the new password and confirm password match
-        if (passwordChangeRequest.Password != passwordChangeRequest.ConfirmPassword)
-        {
-            _logger.LogWarning("New password and confirm password do not match.");
-            return false; // Bad request: password mismatch
-        }
-
         try
         {
-            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(passwordChangeRequest.Token); // Retrieve authentication and verification status
+            // Get token from the cookie
+            var token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"];
+
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No token found in cookies.");
+                return false; // No token in cookies
+            }
+
+            // Call ValidateAccessToken to check if the user is authenticated and verified
+            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token);
 
             if (!isAuthenticated)
             {
-                _logger.LogInformation("Token is invalid or expired");
-                return false;  // Token is invalid or expired
+                _logger.LogInformation("Token is invalid or expired.");
+                return false;
             }
 
-            // Optionally, check if the token is verified if needed
             if (!isAccountVerified)
             {
-                _logger.LogInformation("Token is not verified");
-                return false;  // Token is not verified
+                _logger.LogInformation("Token is not verified.");
+                return false;
             }
 
-
-            // Extract company ID from the token
-            var companyIdString = _accessTokenService.GetUserIdFromToken(passwordChangeRequest.Token);
+            // Get the company ID from the token
+            var companyIdString = _accessTokenService.GetUserIdFromToken(token);
             if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
             {
                 _logger.LogWarning("Unable to retrieve or parse company ID from token.");
-                return false; // Bad request: invalid company ID
+                return false;
             }
 
-            // Retrieve the company entity by ID
+            // Fetch the company from the database
             var company = await _companyRepository.GetByIdAsync(companyId);
             if (company == null)
             {
                 _logger.LogWarning("Company not found for password change.");
-                return false; // Not found: company does not exist
+                return false;
             }
 
-            // Hash the new password and update the company's password hash
-            company.PasswordHash = _passwordHasher.HashPassword(company, passwordChangeRequest.Password);
+            // Verify the current password before proceeding
+            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(company, company.PasswordHash, passwordChangeRequest.CurrentPassword);
+            if (passwordVerificationResult == PasswordVerificationResult.Failed)
+            {
+                _logger.LogWarning("Current password is incorrect.");
+                return false; // Reject request if the current password is wrong
+            }
+
+            // Ensure new password and confirm password match
+            if (passwordChangeRequest.NewPassword != passwordChangeRequest.ConfirmPassword)
+            {
+                _logger.LogWarning("New password and confirm password do not match.");
+                return false;
+            }
+
+            // Hash and update password
+            company.PasswordHash = _passwordHasher.HashPassword(company, passwordChangeRequest.NewPassword);
             await _companyRepository.UpdateAsync(company);
 
             _logger.LogInformation("Password successfully changed.");
-            return true; // Success: password changed
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An error occurred while changing the password.");
-            return false; // Internal Server Error: exception occurred
+            return false;
         }
     }
 }

@@ -20,6 +20,8 @@ public class AccessTokenService : IAccessTokenService
     private static readonly string BlacklistCacheKey = "Blacklist_"; // Prefix for the blacklist cache key
     private static readonly string IpCacheKey = "IpAddress_";
 
+    private readonly List<string> _cacheKeys = new List<string>(); // Added to track cache keys
+
     public AccessTokenService(IConfiguration configuration, ILogger<AccessTokenService> logger, IHttpContextAccessor httpContextAccessor, IMemoryCache memoryCache)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -58,23 +60,27 @@ public class AccessTokenService : IAccessTokenService
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: DateTime.Now.AddHours(1),
             signingCredentials: creds
         );
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-        _memoryCache.Set(TokenCacheKey + user.Id, tokenString, TimeSpan.FromHours(1));
-
         var userIpInfo = GetUserIp();
-        _memoryCache.Set(IpCacheKey + user.Id, userIpInfo.IpAddress, TimeSpan.FromHours(1)); // Store IP for 1 hour
+
+        // Store token in memory cache
+        _memoryCache.Set(TokenCacheKey + user.Id, tokenString, TimeSpan.FromHours(1));
+        _cacheKeys.Add(TokenCacheKey + user.Id); // Track cache key
+
+        // Bind IP/GUID to token (Stored with the same expiration)
+        _memoryCache.Set(IpCacheKey + user.Id, userIpInfo.IpAddress, TimeSpan.FromHours(1));
+        _cacheKeys.Add(IpCacheKey + user.Id); // Track IP cache key
 
         _httpContextAccessor.HttpContext?.Response?.Cookies.Append("AccessToken", tokenString, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.None,
-            Expires = DateTime.UtcNow.AddHours(1)
+            Expires = DateTime.Now.AddHours(1)
         });
 
         _logger.LogInformation($"Generated new access token for user {user.UserName}.");
@@ -122,12 +128,21 @@ public class AccessTokenService : IAccessTokenService
                 return (false, false);
             }
 
-            var storedIp = _memoryCache.Get<string>(IpCacheKey + principal.Identity.Name);
+            var userId = principal.Claims.FirstOrDefault(c => c.Type == "companyId")?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("UserId not found in token claims.");
+                return (false, false);
+            }
+
+            var storedIp = _memoryCache.Get<string>(IpCacheKey + userId);
             var currentIp = GetUserIp().IpAddress;
 
-            if (storedIp != "Unknown IP" && storedIp != currentIp)
+            _logger.LogInformation($"Stored IP/GUID: {storedIp}, Current IP/GUID: {currentIp}");
+
+            if (storedIp != null && storedIp != currentIp)
             {
-                _logger.LogWarning("IP address mismatch. Token validation failed.");
+                _logger.LogWarning("IP/GUID mismatch. Token validation failed.");
                 return (false, false);
             }
 
@@ -158,45 +173,29 @@ public class AccessTokenService : IAccessTokenService
         {
             var tokenKey = TokenCacheKey + user.Id;
 
-            // Check if there's an active token in _memoryCache for this user
             if (_memoryCache.TryGetValue(tokenKey, out var currentToken))
             {
-                // Calculate expiration time in Stockholm time zone, 75 minutes from now.
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm");
-                var expirationTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(75), timeZone);
-
-                // Add the token to the blacklist with a cache expiration of 75 minutes.
                 _memoryCache.Set(BlacklistCacheKey + currentToken.ToString(), new BlacklistedToken
                 {
                     Token = currentToken.ToString(),
-                    ExpirationTime = expirationTime
+                    ExpirationTime = DateTime.Now.AddMinutes(75)
                 }, TimeSpan.FromMinutes(75));
 
-                // Remove the token from the active token cache
                 _memoryCache.Remove(tokenKey);
-
-                // Remove the IP address from cache as well
                 _memoryCache.Remove(IpCacheKey + user.Id);
 
-                _logger.LogInformation($"Token for user {user.UserName} revoked and added to blacklist.");
-
-                // Clear the cookie to invalidate the session
                 var context = _httpContextAccessor.HttpContext;
                 if (context != null)
                 {
                     context.Response.Cookies.Delete("AccessToken");
                     _logger.LogInformation($"Access token cleared for user {user.UserName}.");
                 }
-
             }
-
             else
             {
                 _logger.LogWarning($"No active token found for user {user.UserName}. Token not revoked.");
             }
-
         }
-
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error revoking token for user {user.UserName}.");
@@ -207,10 +206,28 @@ public class AccessTokenService : IAccessTokenService
 
     #region Helper Methods
 
-    // Helper method to get the user's IP and User-Agent
     public UserIpInfo GetUserIp()
     {
-        var ipAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "Unknown IP";
+        var ipAddress = _httpContextAccessor.HttpContext?.Request?.Headers["X-Forwarded-For"].FirstOrDefault();
+
+        if (string.IsNullOrEmpty(ipAddress))
+        {
+            ipAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+        }
+
+        // Handle loopback addresses for local dev
+        if (ipAddress == "::1" || ipAddress == "127.0.0.1")
+        {
+            ipAddress = "127.0.0.1";
+        }
+
+        if (string.IsNullOrEmpty(ipAddress))
+        {
+            // Generate a GUID as fallback for missing IP
+            ipAddress = Guid.NewGuid().ToString();
+            _logger.LogInformation($"Generated GUID as fallback: {ipAddress}");
+        }
+
         var userAgent = _httpContextAccessor.HttpContext?.Request?.Headers["User-Agent"].ToString() ?? "Unknown User-Agent";
 
         return new UserIpInfo
@@ -241,7 +258,7 @@ public class AccessTokenService : IAccessTokenService
     {
         if (_memoryCache.TryGetValue(BlacklistCacheKey + token, out BlacklistedToken blacklistedToken))
         {
-            if (blacklistedToken.ExpirationTime > DateTime.UtcNow)
+            if (blacklistedToken.ExpirationTime > DateTime.Now)
             {
                 _logger.LogWarning("Token is blacklisted.");
                 return false;  // Token is blacklisted
@@ -250,6 +267,47 @@ public class AccessTokenService : IAccessTokenService
         }
         return true;  // Token is valid
     }
+
+        #region Utilities 
+        public void CleanUpExpiredTokens()
+        {
+            var currentTime = DateTime.Now;
+            foreach (var tokenKey in _cacheKeys)  // Use _cacheKeys to iterate
+            {
+                if (IsTokenExpired(tokenKey, currentTime))
+                {
+                    _memoryCache.Remove(tokenKey);
+                    _memoryCache.Remove(IpCacheKey + tokenKey); // Clean up the associated IP/GUID
+                    _logger.LogInformation($"Expired token and IP/GUID removed for token: {tokenKey}");
+                }
+            }
+        }
+
+        private bool IsTokenExpired(string tokenKey, DateTime currentTime)
+        {
+            var token = _memoryCache.Get<string>(tokenKey);
+            // Logic to check if the token is expired, for example by parsing the JWT expiration claim
+            return token != null && IsJwtExpired(token, currentTime);
+        }
+
+        private bool IsJwtExpired(string token, DateTime currentTime)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadToken(token) as JwtSecurityToken;
+            if (jwtToken == null)
+            {
+                return false; // Invalid token
+            }
+
+            var expiration = jwtToken?.Payload?.Expiration?.ToString();
+            if (DateTime.TryParse(expiration, out var expiryTime))
+            {
+                return currentTime > expiryTime;
+            }
+
+            return false;
+        }
+        #endregion
 
     #endregion
 }

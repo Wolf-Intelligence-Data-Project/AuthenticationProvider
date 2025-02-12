@@ -17,6 +17,7 @@ using AuthenticationProvider.Interfaces.Security;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
 using AuthenticationProvider.Services.Security.Clients;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,8 +42,8 @@ builder.Services.AddScoped<IAccountVerificationService, AccountVerificationServi
 builder.Services.AddScoped<IAccountVerificationClient, AccountVerificationClient>();
 builder.Services.AddHttpClient<ICaptchaVerificationService, CaptchaVerificationService>();
 
-
 builder.Services.AddScoped<IAccessTokenService, AccessTokenService>();
+builder.Services.AddHostedService<AccessTokenCleanupService>();
 
 builder.Services.AddScoped<ISignInService, SignInService>();
 builder.Services.AddScoped<ISignUpService, SignUpService>();
@@ -57,9 +58,7 @@ builder.Services.AddScoped<IResetPasswordTokenRepository, ResetPasswordTokenRepo
 builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
 builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 
-builder.Services.AddScoped<IBusinessTypeService, BusinessTypeService>();
 builder.Services.AddSingleton<IEmailRestrictionService, EmailRestrictionService>();
-
 
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
@@ -95,6 +94,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
         ValidAudience = builder.Configuration["JwtAccess:Audience"],
         ClockSkew = TimeSpan.Zero,
+        ValidateLifetime = true  // Ensure token expiration is checked here as well
     };
 
     options.Events = new JwtBearerEvents
@@ -104,7 +104,7 @@ builder.Services.AddAuthentication(options =>
             var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
             if (isVerifiedClaim != "true")
             {
-                context.Fail("The account is not verified.");
+                context.Fail("Kontot är inte verifierat.");
             }
             return Task.CompletedTask;
         },
@@ -119,6 +119,7 @@ builder.Services.AddAuthentication(options =>
         }
     };
 })
+
 
 // Reset Password Token Authentication
 .AddJwtBearer("ResetPassword", options =>
@@ -181,13 +182,13 @@ builder.Services.AddAuthentication(options =>
 // Add Authorization policies
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireAccessToken", policy =>
+    options.AddPolicy("AccessToken", policy =>
         policy.RequireAuthenticatedUser().AddAuthenticationSchemes("Bearer"));
 
-    options.AddPolicy("RequireResetPasswordToken", policy =>
+    options.AddPolicy("ResetPasswordToken", policy =>
         policy.RequireAuthenticatedUser().AddAuthenticationSchemes("ResetPassword"));
 
-    options.AddPolicy("RequireAccountVerificationToken", policy =>
+    options.AddPolicy("AccountVerificationToken", policy =>
         policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerification"));
 });
 
@@ -224,6 +225,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 // Use CORS
 app.UseCors("AllowAll");
 
