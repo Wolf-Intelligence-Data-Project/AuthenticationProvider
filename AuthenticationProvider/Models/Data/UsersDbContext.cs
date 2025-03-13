@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthenticationProvider.Models.Data;
 
-public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+public class UserDbContext : IdentityDbContext<ApplicationUser>
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    public UserDbContext(DbContextOptions<UserDbContext> options) : base(options)
     {
     }
 
     // DbSets for your entities
-    public DbSet<CompanyEntity> Companies { get; set; }
+    public DbSet<UserEntity> Users { get; set; }
     public DbSet<AddressEntity> Addresses { get; set; }
     public DbSet<ResetPasswordTokenEntity> ResetPasswordTokens { get; set; }
     public DbSet<AccountVerificationTokenEntity> AccountVerificationTokens { get; set; }
@@ -20,20 +20,28 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure the CompanyEntity relationships
-        modelBuilder.Entity<CompanyEntity>()
+        // Configure the UserEntity relationships
+        modelBuilder.Entity<UserEntity>()
             .HasMany(c => c.Addresses)
-            .WithOne(a => a.Company)
-            .HasForeignKey(a => a.CompanyId)
-            .OnDelete(DeleteBehavior.Cascade); // Delete addresses when the company is deleted
+            .WithOne(a => a.User)
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade); // Delete addresses when the user is deleted
 
-        // No need for a relationship between CompanyEntity and PrimaryAddressId anymore
+        modelBuilder.Entity<UserEntity>()
+            .HasIndex(u => u.IdentificationNumber)
+            .IsUnique();
+
+        modelBuilder.Entity<UserEntity>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        // No need for a relationship between UserEntity and PrimaryAddressId anymore
 
         // Configure the AddressEntity
         modelBuilder.Entity<AddressEntity>(entity =>
         {
-            entity.HasKey(a => a.Id); // Primary key
-            entity.Property(a => a.StreetAddress).IsRequired();
+            entity.HasKey(a => a.AddressId); // Primary key
+            entity.Property(a => a.StreetAndNumber).IsRequired();
             entity.Property(a => a.PostalCode).IsRequired();
             entity.Property(a => a.City).IsRequired();
             entity.Property(a => a.Region).IsRequired();
@@ -48,10 +56,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.ToTable("ResetPasswordTokens"); // Explicit table name
             entity.HasKey(t => t.Id); // Primary key
 
-            entity.HasOne(t => t.Company)
+            entity.HasOne(t => t.User)
                 .WithMany()
-                .HasForeignKey(t => t.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade); // Delete tokens when a company is deleted
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // Delete tokens when a user is deleted
 
             entity.Property(t => t.Token).IsRequired();
             entity.Property(t => t.ExpiryDate).IsRequired();
@@ -64,10 +72,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.ToTable("AccountVerificationTokens"); // Explicit table name
             entity.HasKey(t => t.Id); // Primary key
 
-            entity.HasOne(t => t.Company)
+            entity.HasOne(t => t.User)
                 .WithMany()
-                .HasForeignKey(t => t.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade); // Cascade delete tokens when a company is deleted
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // Cascade delete tokens when a user is deleted
 
             entity.Property(t => t.Token).IsRequired();
             entity.Property(t => t.ExpiryDate).IsRequired();

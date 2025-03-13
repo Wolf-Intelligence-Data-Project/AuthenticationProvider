@@ -13,7 +13,7 @@ public interface IAccountVerificationTokenRepository
 
     Task MarkAsUsedAsync(Guid tokenId);
 
-    Task RevokeAndDeleteAsync(Guid companyId);
+    Task RevokeAndDeleteAsync(Guid userId);
 
     Task RevokeAndDeleteByTokenAsync(string token);
 }

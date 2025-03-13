@@ -7,10 +7,10 @@ namespace AuthenticationProvider.Repositories.Tokens;
 
 public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
 {
-    private readonly ApplicationDbContext _context;
+    private readonly UserDbContext _context;
     private readonly ILogger<ResetPasswordTokenRepository> _logger;
 
-    public ResetPasswordTokenRepository(ApplicationDbContext context, ILogger<ResetPasswordTokenRepository> logger)
+    public ResetPasswordTokenRepository(UserDbContext context, ILogger<ResetPasswordTokenRepository> logger)
     {
         _context = context;
         _logger = logger;
@@ -25,8 +25,9 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
+            var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
             return await _context.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")) && !t.IsUsed);
+                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > stockholmTime && !t.IsUsed);
         }
         catch (Exception ex)
         {
@@ -44,14 +45,17 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
+            var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
+
             return await _context.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")) && !t.IsUsed);
+                .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > stockholmTime && !t.IsUsed);
         }
         catch (Exception ex)
         {
-            throw new Exception("Det gick inte återställa lösenordet.");
+            throw new Exception("Det gick inte att återställa lösenordet.", ex);
         }
     }
+
 
     /// <summary>
     /// Creates a new reset password token and saves it to the database.
@@ -73,15 +77,15 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     }
 
     /// <summary>
-    /// Deletes all reset password tokens associated with a given company ID.
+    /// Deletes all reset password tokens associated with a given user ID.
     /// </summary>
-    /// <param name="companyId">The ID of the company for which tokens should be deleted.</param>
-    public async Task DeleteAsync(Guid companyId)
+    /// <param name="userId">The ID of the user for which tokens should be deleted.</param>
+    public async Task DeleteAsync(Guid userId)
     {
         try
         {
             var tokens = await _context.ResetPasswordTokens
-                .Where(t => t.CompanyId == companyId)
+                .Where(t => t.UserId == userId)
                 .ToListAsync();
 
             if (tokens.Any())

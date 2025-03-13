@@ -2,6 +2,7 @@
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Responses.Errors;
+using AuthenticationProvider.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -13,47 +14,47 @@ namespace AuthenticationProvider.Services.Tokens;
 public class AccountVerificationTokenService : IAccountVerificationTokenService
 {
     private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AccountVerificationTokenService> _logger;
 
     public AccountVerificationTokenService(
         IAccountVerificationTokenRepository accountVerificationTokenRepository,
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         IConfiguration configuration,
         ILogger<AccountVerificationTokenService> logger)
     {
         _accountVerificationTokenRepository = accountVerificationTokenRepository;
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _configuration = configuration;
         _logger = logger;
     }
 
-    public async Task<string> GenerateAccountVerificationTokenAsync(Guid companyId)
+    public async Task<string> GenerateAccountVerificationTokenAsync(Guid userId)
     {
-        // Check if the company exists
-        var company = await _companyRepository.GetByIdAsync(companyId);
-        if (company == null)
+        // Check if the user exists
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
         {
-            _logger.LogWarning("The company not found");
+            _logger.LogWarning("The user not found");
             throw new ArgumentException("Ogiltigt företag.");
         }
 
-        // Check if the company is already verified
-        if (company.IsVerified)
+        // Check if the user is already verified
+        if (user.IsVerified)
         {
             _logger.LogWarning("The account is already verified.");
             throw new InvalidOperationException("Företagskontot är redan verifierat.");
         }
 
-        if (string.IsNullOrEmpty(company.Email))
+        if (string.IsNullOrEmpty(user.Email))
         {
-            _logger.LogWarning("Company email cannot be null.");
+            _logger.LogWarning("User email cannot be null.");
             throw new ArgumentException("E-post krävs för att verifiera kontot.");
         }
 
         // Revoke and delete any existing verification tokens
-        await _accountVerificationTokenRepository.RevokeAndDeleteAsync(companyId);
+        await _accountVerificationTokenRepository.RevokeAndDeleteAsync(userId);
 
         // Generate a new JWT token
         var secretKey = _configuration["JwtVerification:Key"];
@@ -72,8 +73,8 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[] {
-            new Claim(ClaimTypes.NameIdentifier, companyId.ToString()),
-            new Claim(ClaimTypes.Email, company.Email),
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Email, user.Email),
             new Claim("token_type", "AccountVerification"),
         }),
             Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(30),
@@ -89,8 +90,8 @@ public class AccountVerificationTokenService : IAccountVerificationTokenService
         var accountVerificationToken = new AccountVerificationTokenEntity
         {
             Token = tokenString,
-            CompanyId = companyId,
-            ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddHours(1),
+            UserId = userId,
+            ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(31),
             IsUsed = false
         };
 

@@ -48,7 +48,7 @@ public class AccessTokenService : IAccessTokenService
 
         var claims = new[] {
             new Claim(ClaimTypes.Name, user.UserName),
-            new Claim("companyId", user.Id),
+            new Claim("userId", user.Id),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("isVerified", user.IsVerified.ToString().ToLower())
         };
@@ -88,7 +88,7 @@ public class AccessTokenService : IAccessTokenService
         return tokenString;
     }
 
-    public (bool isAuthenticated, bool isAccountVerified) ValidateAccessToken(string token = null)
+    public (bool isAuthenticated, bool isAccountVerified) ValidateAccessToken(string token)
     {
         try
         {
@@ -128,7 +128,7 @@ public class AccessTokenService : IAccessTokenService
                 return (false, false);
             }
 
-            var userId = principal.Claims.FirstOrDefault(c => c.Type == "companyId")?.Value;
+            var userId = principal.Claims.FirstOrDefault(c => c.Type == "userId")?.Value;
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogWarning("UserId not found in token claims.");
@@ -244,8 +244,8 @@ public class AccessTokenService : IAccessTokenService
             var handler = new JwtSecurityTokenHandler();
             var jsonToken = handler.ReadToken(token) as JwtSecurityToken;
 
-            var companyIdClaim = jsonToken?.Claims.FirstOrDefault(c => c.Type == "companyId");
-            return companyIdClaim?.Value;
+            var userIdClaim = jsonToken?.Claims.FirstOrDefault(c => c.Type == "userId");
+            return userIdClaim?.Value;
         }
         catch (Exception ex)
         {

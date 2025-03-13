@@ -13,7 +13,7 @@ public class AccountVerificationService : IAccountVerificationService
     private readonly IAccountVerificationTokenRepository _accountVerificationTokenRepository;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly IAccountVerificationClient _accountVerificationClient;
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ILogger<AccountVerificationService> _logger;
     private readonly IConfiguration _configuration;
 
@@ -21,14 +21,14 @@ public class AccountVerificationService : IAccountVerificationService
         IAccountVerificationTokenRepository accountVerificationTokenRepository,
         IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationClient accountVerificationClient,
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         ILogger<AccountVerificationService> logger,
         IConfiguration configuration)
     {
         _accountVerificationTokenRepository = accountVerificationTokenRepository;
         _accountVerificationClient = accountVerificationClient;
         _accountVerificationTokenService = accountVerificationTokenService;
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _logger = logger;
         _configuration = configuration;
     }
@@ -45,7 +45,7 @@ public class AccountVerificationService : IAccountVerificationService
         {
             if (!await EmailValidation(token))
             {
-                _logger.LogWarning("The email in the token does not match any company.");
+                _logger.LogWarning("The email in the token does not match any user.");
                 return ServiceResult.EmailNotFound;
             }
 
@@ -81,26 +81,26 @@ public class AccountVerificationService : IAccountVerificationService
             return ServiceResult.InvalidToken;  // Return failure if token is invalid
         }
 
-        // Extract companyId from the accountVerificationToken
-        var companyId = accountVerificationToken.CompanyId;
+        // Extract userId from the accountVerificationToken
+        var userId = accountVerificationToken.UserId;
 
-        var company = await _companyRepository.GetByIdAsync(companyId);  // Fetch the company using companyId
-        if (company == null)
+        var user = await _userRepository.GetByIdAsync(userId);  // Fetch the user using userId
+        if (user == null)
         {
-            _logger.LogWarning("Company not found.");
-            return ServiceResult.CompanyNotFound;  // Handle case when company is not found
+            _logger.LogWarning("User not found.");
+            return ServiceResult.UserNotFound;  // Handle case when user is not found
         }
 
-        if (company.IsVerified)
+        if (user.IsVerified)
         {
-            _logger.LogInformation("The company is already verified.");
+            _logger.LogInformation("The user is already verified.");
             return ServiceResult.AlreadyVerified;  // Already verified, no further action needed
         }
 
-        company.IsVerified = true;
-        await _companyRepository.UpdateAsync(company);  // Update the company as verified
+        user.IsVerified = true;
+        await _userRepository.UpdateAsync(user);  // Update the user as verified
 
-        // Mark the account verification token as used after the company is successfully verified
+        // Mark the account verification token as used after the user is successfully verified
         await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(token);
 
         _logger.LogInformation("Account verified successfully.");
@@ -117,23 +117,23 @@ public class AccountVerificationService : IAccountVerificationService
 
         try
         {
-            // Fetch the company by email
-            var company = await _companyRepository.GetByEmailAsync(email);
-            if (company == null)
+            // Fetch the user by email
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
             {
-                _logger.LogWarning("Company not found with email: {Email}", email);
+                _logger.LogWarning("User not found with email: {Email}", email);
                 return ServiceResult.Failure;  // Use Failure property directly
             }
 
-            // Set the company as not verified
-            company.IsVerified = false;
-            await _companyRepository.UpdateAsync(company);
+            // Set the user as not verified
+            user.IsVerified = false;
+            await _userRepository.UpdateAsync(user);
 
-            // Generate a new account verification token for the company
-            var newToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(company.Id);
+            // Generate a new account verification token for the user
+            var newToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(user.UserId);
             if (string.IsNullOrEmpty(newToken))
             {
-                _logger.LogError("Failed to create a new verification token for company with email: {Email}", email);
+                _logger.LogError("Failed to create a new verification token for user with email: {Email}", email);
                 return ServiceResult.Failure;  // Use Failure property directly
             }
 
@@ -144,7 +144,7 @@ public class AccountVerificationService : IAccountVerificationService
                 return ServiceResult.Failure;  // Use Failure property directly
             }
 
-            _logger.LogInformation("Verification email resent to company with email: {Email}", email);
+            _logger.LogInformation("Verification email resent to user with email: {Email}", email);
 
             return ServiceResult.Success;  // Return Success if everything went well
         }
@@ -162,37 +162,30 @@ public class AccountVerificationService : IAccountVerificationService
             var tokenHandler = new JwtSecurityTokenHandler();
             var jwtToken = tokenHandler.ReadJwtToken(token);
 
-            // Log all claims for debugging (optional)
-            foreach (var claim in jwtToken.Claims)
-            {
-                _logger.LogInformation($"Claim: {claim.Type} = {claim.Value}");
-            }
-
             // Extract the email claim from the token
-            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
 
             if (string.IsNullOrEmpty(emailClaim))
             {
                 _logger.LogWarning("No email claim found in the token.");
                 return false;
             }
-
-            // Check if a company exists with the extracted email
-            var company = await _companyRepository.GetByEmailAsync(emailClaim);
-            if (company == null)
+            // Check if a user exists with the extracted email
+            var user = await _userRepository.GetByEmailAsync(emailClaim);
+            if (user == null)
             {
-                _logger.LogWarning("No company found with the email from the token.");
+                _logger.LogWarning("No user found with the email from the token.");
                 return false;
             }
 
-            // Check if the company is already verified (optional)
-            if (company.IsVerified)
+            // Check if the user is already verified (optional)
+            if (user.IsVerified)
             {
-                _logger.LogInformation("The company is already verified.");
+                _logger.LogInformation("The user is already verified.");
                 return false; // If already verified, return false or handle as needed
             }
 
-            return true; // Email claim exists, matches a company, and company is not verified yet
+            return true; // Email claim exists, matches a user, and user is not verified yet
         }
         catch (Exception ex)
         {

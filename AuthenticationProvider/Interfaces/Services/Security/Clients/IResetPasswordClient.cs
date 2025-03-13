@@ -11,7 +11,7 @@ public interface IResetPasswordClient
     /// Sends a password reset request containing a unique reset token 
     /// to an external provider, which will then deliver the email to the user.
     /// </summary>
-    /// <param name="token">A unique token used to authorize the password reset request.</param>
+    /// <param name="resetId">A unique token used to authorize the password reset request.</param>
     /// <returns>True if the request was successfully processed by the provider; otherwise, false.</returns>
-    Task<bool> SendResetPasswordEmailAsync(string token);
+    Task<bool> SendResetPasswordEmailAsync(string resetId);
 }

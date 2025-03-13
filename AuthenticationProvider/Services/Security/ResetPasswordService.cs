@@ -2,9 +2,7 @@
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Requests;
-using AuthenticationProvider.Models.Responses;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
 
@@ -14,21 +12,51 @@ public class ResetPasswordService : IResetPasswordService
 {
     private readonly IResetPasswordClient _resetPasswordClient;
     private readonly IResetPasswordTokenService _resetPasswordTokenService;
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ILogger<ResetPasswordService> _logger;
     private readonly PasswordHasher<object> _passwordHasher;
 
     public ResetPasswordService(
         IResetPasswordClient resetPasswordClient,
         IResetPasswordTokenService resetPasswordTokenService,
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         ILogger<ResetPasswordService> logger)
     {
         _resetPasswordClient = resetPasswordClient ?? throw new ArgumentNullException(nameof(resetPasswordClient));
         _resetPasswordTokenService = resetPasswordTokenService ?? throw new ArgumentNullException(nameof(resetPasswordTokenService));
-        _companyRepository = companyRepository ?? throw new ArgumentNullException(nameof(companyRepository));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _passwordHasher = new PasswordHasher<object>();
+    }
+
+
+    public async Task CreateResetPasswordTokenAsync(string email)
+    {
+        try
+        {
+            var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
+            dynamic tokenInfo = resetPasswordToken;
+
+            string resetId = tokenInfo.TokenId;
+            string token = tokenInfo.TokenString;
+
+            if (resetPasswordToken == null)
+            {
+                _logger.LogWarning("Token could not be generated.");
+            }
+
+
+            var emailSent = await SendResetPasswordEmailAsync(token!, resetId!);
+            if (!emailSent)
+            {
+                _logger.LogWarning("Token could not be transfered/sent further.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Misslyckades med att skicka e-post för lösenordsåterställning.");
+            throw new InvalidOperationException("Ett oväntat fel uppstod, försök igen senare.");
+        }
     }
 
     /// <summary>
@@ -36,9 +64,9 @@ public class ResetPasswordService : IResetPasswordService
     /// </summary>
     /// <param name="token">The reset password token.</param>
     /// <returns>True if the email is sent successfully; otherwise, false.</returns>
-    public async Task<bool> SendResetPasswordEmailAsync(string token)
+    private async Task<bool> SendResetPasswordEmailAsync(string token, string resetId)
     {
-        if (string.IsNullOrWhiteSpace(token) || token.Length < 10)
+        if (string.IsNullOrWhiteSpace(token) || token.Length < 10 || resetId == null || token == null)
         {
             _logger.LogWarning("Invalid token provided for reset password email.");
             return false;
@@ -48,7 +76,7 @@ public class ResetPasswordService : IResetPasswordService
         {
             if (!await EmailValidation(token))
             {
-                _logger.LogWarning("The email in the token does not match any company.");
+                _logger.LogWarning("The email in the token does not match any user.");
                 return false;
             }
 
@@ -60,8 +88,8 @@ public class ResetPasswordService : IResetPasswordService
                 return false;
             }
 
-            // Send the reset password email using the client
-            bool result = await _resetPasswordClient.SendResetPasswordEmailAsync(token);
+            // Sending only the reset password token id using the client
+            bool result = await _resetPasswordClient.SendResetPasswordEmailAsync(resetId);
 
             if (result)
             {
@@ -120,16 +148,16 @@ public class ResetPasswordService : IResetPasswordService
                 return false;
             }
 
-            // Update the company's password hash
-            var company = await _companyRepository.GetByIdAsync(resetPasswordToken.CompanyId);
-            if (company != null)
+            // Update the user's password hash
+            var user = await _userRepository.GetByIdAsync(resetPasswordToken.UserId);
+            if (user != null)
             {
-                company.PasswordHash = _passwordHasher.HashPassword(null, resetPasswordRequest.NewPassword);
-                await _companyRepository.UpdateAsync(company);
+                user.PasswordHash = _passwordHasher.HashPassword(null, resetPasswordRequest.NewPassword);
+                await _userRepository.UpdateAsync(user);
             }
             else
             {
-                _logger.LogWarning("Company not found for the provided token.");
+                _logger.LogWarning("User not found for the provided token.");
                 return false;
             }
 
@@ -150,16 +178,10 @@ public class ResetPasswordService : IResetPasswordService
         try
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var jwtToken = tokenHandler.ReadJwtToken(token);
-
-            // Log all claims for debugging
-            foreach (var claim in jwtToken.Claims)
-            {
-                _logger.LogInformation($"Claim: {claim.Type} = {claim.Value}");
-            }
+            var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
             // Extract the email claim from the token
-            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
 
             if (string.IsNullOrEmpty(emailClaim))
             {
@@ -167,25 +189,18 @@ public class ResetPasswordService : IResetPasswordService
                 return false;
             }
 
-            // Check if the email exists in the company database
-            var company = await _companyRepository.GetByEmailAsync(emailClaim);
-            if (company == null)
+            // Check if the email exists in the user database
+            var user = await _userRepository.GetByEmailAsync(emailClaim);
+            if (user == null)
             {
-                _logger.LogWarning("No company found with the email from the token.");
+                _logger.LogWarning("No user found with the email from the token.");
                 return false;
             }
 
-            // Compare the email from the token with the company's email
-            if (!company.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase))
+            // Compare the email from the token with the user's email
+            if (!user.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning("The email in the token does not match the company's email.");
-                return false;
-            }
-
-            // Check token expiration
-            if (jwtToken.ValidTo < TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")))
-            {
-                _logger.LogWarning("The token has expired.");
+                _logger.LogWarning("The email in the token does not match the user's email.");
                 return false;
             }
 

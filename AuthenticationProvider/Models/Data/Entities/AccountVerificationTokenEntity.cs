@@ -7,7 +7,7 @@ public class AccountVerificationTokenEntity
     [Required]
     public Guid Id { get; set; } = Guid.NewGuid();
     [Required]
-    public Guid CompanyId { get; set; }
+    public Guid UserId { get; set; }
     [Required]
     public string Token { get; set; }
     [Required]
@@ -15,5 +15,5 @@ public class AccountVerificationTokenEntity
     [Required]
     public bool IsUsed { get; set; } = false;
     [Required]
-    public CompanyEntity Company { get; set; }
+    public UserEntity User { get; set; }
 }

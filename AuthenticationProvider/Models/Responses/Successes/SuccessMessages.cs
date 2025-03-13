@@ -37,9 +37,9 @@ public static class SuccessMessages
     public static readonly string RequestProcessed = "Din förfrågan har bearbetats.";
 
     /// <summary>
-    /// Message confirming that a company has been successfully registered.
+    /// Message confirming that a user has been successfully registered.
     /// </summary>
-    public static readonly string CompanyRegistered = "Företaget har registrerats.";
+    public static readonly string UserRegistered = "Användaren har registrerats.";
 
     /// <summary>
     /// Message indicating that a password reset has been successfully completed.

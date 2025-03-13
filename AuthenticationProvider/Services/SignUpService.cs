@@ -1,18 +1,13 @@
-﻿using AuthenticationProvider.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using AuthenticationProvider.Models.Responses;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Services;
 using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using AuthenticationProvider.Interfaces.Services;
 
 namespace AuthenticationProvider.Services;
 
@@ -21,32 +16,41 @@ namespace AuthenticationProvider.Services;
 /// </summary>
 public class SignUpService : ISignUpService
 {
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly IAddressRepository _addressRepository;
     private readonly ILogger<SignUpService> _logger;
-    private readonly PasswordHasher<CompanyEntity> _passwordHasher;
+    private readonly IPasswordHasher<UserEntity> _passwordHasher;
     private readonly IEmailRestrictionService _emailRestrictionService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IAccessTokenService _accessTokenService;
+    private readonly ISignOutService _signOutService;
 
     public SignUpService(
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationService accountVerificationService,
         IAddressRepository addressRepository,
         ILogger<SignUpService> logger,
-        IEmailRestrictionService emailRestrictionService)
+        IEmailRestrictionService emailRestrictionService,
+        IHttpContextAccessor httpContextAccessor,
+        IAccessTokenService accessTokenService,
+        ISignOutService signOutService)
     {
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _accountVerificationTokenService = accountVerificationTokenService;
         _accountVerificationService = accountVerificationService;
         _addressRepository = addressRepository;
         _logger = logger;
-        _passwordHasher = new PasswordHasher<CompanyEntity>();
+        _passwordHasher = new PasswordHasher<UserEntity>();
         _emailRestrictionService = emailRestrictionService;
+        _httpContextAccessor = httpContextAccessor;
+        _accessTokenService = accessTokenService;
+        _signOutService = signOutService;
     }
 
-    public async Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request)
+    public async Task<SignUpResponse> RegisterUserAsync(SignUpRequest request)
     {
         ValidateSignUpRequest(request);
 
@@ -56,7 +60,7 @@ public class SignUpService : ISignUpService
             throw new InvalidOperationException("Den angivna e-posten är inte tillåten.");
         }
 
-        if (await _companyRepository.CompanyExistsAsync(request.OrganizationNumber, request.Email))
+        if (await _userRepository.UserExistsAsync(request.IdentificationNumber, request.Email))
         {
             throw new InvalidOperationException("Ett företag med angivet organisationsnummer eller e-post finns redan.");
         }
@@ -64,27 +68,27 @@ public class SignUpService : ISignUpService
         // Hash the password
         string hashedPassword = _passwordHasher.HashPassword(null, request.Password);
 
-        var company = new CompanyEntity
+        var user = new UserEntity
         {
-            OrganizationNumber = request.OrganizationNumber,
-            CompanyName = request.CompanyName,
+            IdentificationNumber = request.IdentificationNumber,
+            IsCompany = request.IsCompany,
+            CompanyName = request.IsCompany == true ? request.CompanyName : null!,
             Email = request.Email,
-            BusinessType = request.BusinessType,
-            ResponsiblePersonName = request.ResponsiblePersonName,
+            BusinessType = request.IsCompany == true ? request.BusinessType : null!,
+            FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
             TermsAndConditions = request.TermsAndConditions,
             IsVerified = false,
-            PasswordHash = hashedPassword
+            PasswordHash = hashedPassword      
         };
 
-        // Add the company to the database
-        await _companyRepository.AddAsync(company);
+        await _userRepository.AddAsync(user);
 
         // Add the primary and additional addresses
-        await AddAddressesAsync(request, company);
+        await AddAddressesAsync(request, user);
 
         // Generate an account verification token
-        var token = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(company.Id);
+        var token = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(user.UserId);
 
         // Send the verification email
         var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
@@ -96,40 +100,61 @@ public class SignUpService : ISignUpService
         return new SignUpResponse
         {
             Success = true,
-            CompanyId = company.Id,
+            UserId = user.UserId,
             Token = token
         };
     }
-
-    public async Task DeleteCompanyAsync(Guid companyId)
+    public async Task DeleteUserAsync(DeleteRequest deleteRequest)
     {
-        var company = await _companyRepository.GetByIdAsync(companyId);
-        if (company == null)
+      
+
+        var token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"];
+        var userIdString = _accessTokenService.GetUserIdFromToken(token!);
+        var password = deleteRequest.Password;
+
+        if (!Guid.TryParse(userIdString, out var userId))
         {
-            throw new InvalidOperationException("Företaget hittades inte.");
+            throw new InvalidOperationException("Ogiltigt användar-ID.");
+        }
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            throw new InvalidOperationException("Användaren hittades inte.");
         }
 
-        await _companyRepository.DeleteAsync(companyId);
-        _logger.LogInformation($"Företaget med ID {companyId} har raderats.");
+        var passwordMatch = _passwordHasher.VerifyHashedPassword(user, password, user.PasswordHash);
+        if (passwordMatch != PasswordVerificationResult.Success)
+        {
+            throw new UnauthorizedAccessException("Ogiltigt lösenord.");
+        }
+
+        var signOutResult = await _signOutService.SignOutAsync(userId.ToString());
+        if (!signOutResult)
+        {
+            _logger.LogWarning("Failed to sign out the user");
+        }
+       
+        await _userRepository.DeleteAsync(userId);
+        _logger.LogInformation($"Användaren med ID {userId} har raderats.");
     }
 
-    private async Task AddAddressesAsync(SignUpRequest request, CompanyEntity company)
+    private async Task AddAddressesAsync(SignUpRequest request, UserEntity user)
     {
-        // Retrieve all existing addresses associated with the company once
-        var existingAddresses = await _addressRepository.GetAddressesByCompanyIdAsync(company.Id);
+        // Retrieve all existing addresses associated with the user once
+        var existingAddresses = await _addressRepository.GetAddressesByUserIdAsync(user.UserId);
 
         // Add primary address
         if (request.PrimaryAddress != null)
         {
-            if (string.IsNullOrWhiteSpace(request.PrimaryAddress.StreetAddress) ||
+            if (string.IsNullOrWhiteSpace(request.PrimaryAddress.StreetAndNumber) ||
                 string.IsNullOrWhiteSpace(request.PrimaryAddress.City) ||
                 string.IsNullOrWhiteSpace(request.PrimaryAddress.PostalCode))
             {
                 throw new InvalidOperationException("Primary address is incomplete.");
             }
 
-            // Check if the primary address already exists for the company
-            if (existingAddresses.Any(a => a.StreetAddress == request.PrimaryAddress.StreetAddress &&
+            // Check if the primary address already exists for the user
+            if (existingAddresses.Any(a => a.StreetAndNumber == request.PrimaryAddress.StreetAndNumber &&
                                            a.City == request.PrimaryAddress.City &&
                                            a.PostalCode == request.PrimaryAddress.PostalCode))
             {
@@ -138,10 +163,10 @@ public class SignUpService : ISignUpService
 
             var primaryAddress = new AddressEntity
             {
-                StreetAddress = request.PrimaryAddress.StreetAddress,
+                StreetAndNumber = request.PrimaryAddress.StreetAndNumber,
                 City = request.PrimaryAddress.City,
                 PostalCode = request.PrimaryAddress.PostalCode,
-                CompanyId = company.Id,
+                UserId = user.UserId,
                 Region = request.PrimaryAddress.Region,
                 IsPrimary = true
             };
@@ -150,19 +175,19 @@ public class SignUpService : ISignUpService
         }
 
         // Add additional addresses
-        if (request.AdditionalAddresses != null)
+        if (request.AdditionalAddresses != null && request.IsCompany != null)
         {
             foreach (var additionalAddress in request.AdditionalAddresses)
             {
-                if (string.IsNullOrWhiteSpace(additionalAddress.StreetAddress) ||
+                if (string.IsNullOrWhiteSpace(additionalAddress.StreetAndNumber) ||
                     string.IsNullOrWhiteSpace(additionalAddress.City) ||
                     string.IsNullOrWhiteSpace(additionalAddress.PostalCode))
                 {
                     throw new InvalidOperationException("Additional address is incomplete.");
                 }
 
-                // Check if the additional address already exists for the company
-                if (existingAddresses.Any(a => a.StreetAddress == additionalAddress.StreetAddress &&
+                // Check if the additional address already exists for the user
+                if (existingAddresses.Any(a => a.StreetAndNumber == additionalAddress.StreetAndNumber &&
                                                a.City == additionalAddress.City &&
                                                a.PostalCode == additionalAddress.PostalCode))
                 {
@@ -171,10 +196,10 @@ public class SignUpService : ISignUpService
 
                 var address = new AddressEntity
                 {
-                    StreetAddress = additionalAddress.StreetAddress,
+                    StreetAndNumber = additionalAddress.StreetAndNumber,
                     City = additionalAddress.City,
                     PostalCode = additionalAddress.PostalCode,
-                    CompanyId = company.Id,
+                    UserId = user.UserId,
                     Region = additionalAddress.Region,
                     IsPrimary = false
                 };

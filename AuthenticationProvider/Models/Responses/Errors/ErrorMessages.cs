@@ -18,6 +18,6 @@
 //        public const string InternalServerError = "Ett internt serverfel inträffade. Försök igen senare.";
 //        public const string EmailAlreadyInUse = "Den e-postadressen är redan registrerad.";
 //        public const string AccessDenied = "Åtkomst nekad. Du har inte behörighet att se denna information.";
-//        public const string CompanyNotFound = "Företaget kunde inte hittas. Kontrollera att företaget finns och att korrekt identifierare används.";
+//        public const string UserNotFound = "Användaren kunde inte hittas. Kontrollera att företaget finns och att korrekt identifierare används.";
 //    }
 //}

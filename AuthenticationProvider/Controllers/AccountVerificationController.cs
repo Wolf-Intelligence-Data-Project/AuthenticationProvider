@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using Microsoft.AspNetCore.Authorization;
+using AuthenticationProvider.Repositories;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -19,20 +20,20 @@ public class AccountVerificationController : ControllerBase
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly ILogger<AccountVerificationController> _logger;
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly string _frontendUrl;
 
     // Constructor injection of services
     public AccountVerificationController(
         IAccountVerificationService accountVerificationService,
         IAccountVerificationTokenService accountVerificationTokenService,
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         ILogger<AccountVerificationController> logger,
         IConfiguration configuration)
     {
         _accountVerificationTokenService = accountVerificationTokenService;
         _accountVerificationService = accountVerificationService;
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _logger = logger;
         _frontendUrl = configuration["VerificationSuccess"]!;
         if (string.IsNullOrWhiteSpace(_frontendUrl))
@@ -51,7 +52,7 @@ public class AccountVerificationController : ControllerBase
     /// - 400 Bad Request: If the token is missing or invalid.
     /// - 500 Internal Server Error: If an error occurred while sending the email.
     /// </returns>
-    [Authorize(Policy = "AccountVerificationToken")]
+    //[Authorize(Policy = "AccountVerificationToken")]
     [HttpPost("send-verification-email")]
     public async Task<IActionResult> SendVerificationEmail([FromBody] string token)
     {
@@ -87,13 +88,14 @@ public class AccountVerificationController : ControllerBase
     /// <returns>
     /// - 200 OK: If the account was successfully verified and the user is redirected to the frontend.
     /// - 400 Bad Request: If the token is invalid or expired.
-    /// - 404 Not Found: If the account or company is not found.
+    /// - 404 Not Found: If the account or user is not found.
     /// - 500 Internal Server Error: If an error occurs during the verification process.
     /// </returns>
-    [Authorize(Policy = "AccountVerificationToken")]
+    //[Authorize(Policy = "AccountVerificationPolicy")]
     [HttpGet("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromQuery] string token)
     {
+        _logger.LogWarning("Token is missing for the verify email request.");
         // Validate the token
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -132,7 +134,7 @@ public class AccountVerificationController : ControllerBase
             {
                 ServiceResult.InvalidToken => BadRequest(ErrorResponses.TokenExpiredOrInvalid),  // Invalid token
                 ServiceResult.EmailNotFound => NotFound(ErrorResponses.EmailNotFound),  // Email not found
-                ServiceResult.CompanyNotFound => NotFound(ErrorResponses.CompanyNotFound),  // Company not found
+                ServiceResult.UserNotFound => NotFound(ErrorResponses.UserNotFound),  // User not found
                 ServiceResult.AlreadyVerified => Ok("Kontot är redan verifierat."),  // Already verified
                 ServiceResult.Failure => StatusCode(500, ErrorResponses.VerificationFailed),  // Failure
                 _ => StatusCode(500, ErrorResponses.GeneralError)  // General error

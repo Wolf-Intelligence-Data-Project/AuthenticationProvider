@@ -37,9 +37,9 @@ public static class SuccessDetails
     public static readonly string RequestProcessedDetails = "Din förfrågan har bearbetats och avslutats framgångsrikt.";
 
     /// <summary>
-    /// Details confirming that the company has been registered successfully.
+    /// Details confirming that the user has been registered successfully.
     /// </summary>
-    public static readonly string CompanyRegisteredDetails = "Företaget har blivit korrekt registrerat och är nu klart för användning.";
+    public static readonly string UserRegisteredDetails = "Användaren har blivit korrekt registrerat och är nu klart för användning.";
 
     /// <summary>
     /// Details confirming that the password reset has been completed.

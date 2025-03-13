@@ -18,6 +18,6 @@
 //        public const string InternalServerError = "An internal server error occurred. Please check server logs for more information.";
 //        public const string EmailAlreadyInUse = "The email address is already registered in the system. Please use a different email address.";
 //        public const string AccessDenied = "Access to the requested resource is denied. Ensure the user has sufficient permissions and access rights.";
-//        public const string CompanyNotFound = "The company was not found in the system. Verify that the company exists and the correct identifier was used.";
+//        public const string UserNotFound = "The user was not found in the system. Verify that the user exists and the correct identifier was used.";
 //    }
 //}

@@ -33,10 +33,10 @@
             "Your session has expired or is no longer valid. Please log in again."
         );
 
-        public static readonly ErrorDefinition CompanyNotFound = new(
+        public static readonly ErrorDefinition UserNotFound = new(
             "COMPANY_NOT_FOUND",
-            "Företaget kunde inte hittas.",
-            "We couldn't find the company. Please ensure the company information is correct."
+            "Användaren kunde inte hittas.",
+            "We couldn't find the user. Please ensure the user information is correct."
         );
 
         public static readonly ErrorDefinition EmailAlreadyInUse = new(

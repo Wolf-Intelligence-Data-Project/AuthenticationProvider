@@ -12,7 +12,7 @@ public interface IAccountVerificationService
     Task<ServiceResult> SendVerificationEmailAsync(string token);
 
     /// <summary>
-    /// Verifies a company’s email address using a provided verification token.
+    /// Verifies a user’s email address using a provided verification token.
     /// </summary>
     /// <param name="token">The verification token received via email.</param>
     /// <returns>A service result indicating whether the verification was successful.</returns>

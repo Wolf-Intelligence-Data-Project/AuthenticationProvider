@@ -8,10 +8,10 @@ namespace AuthenticationProvider.Repositories.Tokens;
 /// Repository for handling operations related to account verification tokens.
 public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
 {
-    private readonly ApplicationDbContext _context;
+    private readonly UserDbContext _context;
     private readonly ILogger<AccountVerificationTokenRepository> _logger;
 
-    public AccountVerificationTokenRepository(ApplicationDbContext context, ILogger<AccountVerificationTokenRepository> logger)
+    public AccountVerificationTokenRepository(UserDbContext context, ILogger<AccountVerificationTokenRepository> logger)
     {
         _context = context;
         _logger = logger;
@@ -98,27 +98,27 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     }
 
     /// <summary>
-    /// Revokes and deletes all account verification tokens for a specific company.
+    /// Revokes and deletes all account verification tokens for a specific user.
     /// </summary>
-    /// <param name="companyId">The company's unique ID.</param>
-    public async Task RevokeAndDeleteAsync(Guid companyId)
+    /// <param name="userId">The user's unique ID.</param>
+    public async Task RevokeAndDeleteAsync(Guid userId)
     {
         try
         {
-            var company = await _context.Companies.FirstOrDefaultAsync(c => c.Id == companyId);
-            if (company == null)
+            var user = await _context.Users.FirstOrDefaultAsync(c => c.UserId == userId);
+            if (user == null)
             {
-                _logger.LogWarning("Company not found.");
+                _logger.LogWarning("User not found.");
                 return;
             }
 
-            if (!company.IsVerified)
+            if (!user.IsVerified)
             {
                 return;
             }
 
             var tokens = await _context.AccountVerificationTokens
-                .Where(t => t.CompanyId == companyId)
+                .Where(t => t.UserId == userId)
                 .ToListAsync();
 
             if (tokens.Any())

@@ -4,19 +4,16 @@ using AuthenticationProvider.Models.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
 namespace AuthenticationProvider.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250125225428_spelling fix")]
-    partial class spellingfix
+    [DbContext(typeof(UserDbContext))]
+    partial class UserDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -25,15 +22,12 @@ namespace AuthenticationProvider.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("AuthenticationProvider.Data.ApplicationUser", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("AccessFailedCount")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CompanyId")
                         .HasColumnType("int");
 
                     b.Property<string>("CompanyName")
@@ -51,6 +45,10 @@ namespace AuthenticationProvider.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("IdentificationNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsVerified")
                         .HasColumnType("bit");
 
@@ -67,10 +65,6 @@ namespace AuthenticationProvider.Migrations
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("OrganisationNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
@@ -104,13 +98,10 @@ namespace AuthenticationProvider.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.AccountVerificationTokenEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AccountVerificationTokenEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("ExpiryDate")
@@ -125,27 +116,25 @@ namespace AuthenticationProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("UserId");
 
                     b.ToTable("AccountVerificationTokens", (string)null);
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.AddressEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AddressEntity", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("AddressId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsPrimary")
                         .ValueGeneratedOnAdd()
@@ -160,22 +149,57 @@ namespace AuthenticationProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("StreetAddress")
+                    b.Property<string>("StreetAndNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("Id");
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.HasIndex("CompanyId");
+                    b.HasKey("AddressId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Addresses");
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.CompanyEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.ResetPasswordTokenEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ResetPasswordTokens", (string)null);
+                });
+
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.UserEntity", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("BusinessType")
                         .IsRequired()
@@ -191,62 +215,46 @@ namespace AuthenticationProvider.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<bool>("IsVerified")
-                        .HasColumnType("bit");
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("OrganizationNumber")
+                    b.Property<string>("IdentificationNumber")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool?>("IsCompany")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("PersonalDiscount")
+                        .HasColumnType("int");
+
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ResponsiblePersonName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<bool>("TermsAndConditions")
                         .HasColumnType("bit");
 
-                    b.HasKey("Id");
+                    b.HasKey("UserId");
 
-                    b.ToTable("Companies");
-                });
+                    b.HasIndex("Email")
+                        .IsUnique();
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.ResetPasswordTokenEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                    b.HasIndex("IdentificationNumber")
+                        .IsUnique();
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("ExpiryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("ResetPasswordTokens", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -382,37 +390,37 @@ namespace AuthenticationProvider.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.AccountVerificationTokenEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AccountVerificationTokenEntity", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.Entities.CompanyEntity", "Company")
+                    b.HasOne("AuthenticationProvider.Models.Data.Entities.UserEntity", "User")
                         .WithMany()
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Company");
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.AddressEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AddressEntity", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.Entities.CompanyEntity", "Company")
+                    b.HasOne("AuthenticationProvider.Models.Data.Entities.UserEntity", "User")
                         .WithMany("Addresses")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Company");
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.ResetPasswordTokenEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.ResetPasswordTokenEntity", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.Entities.CompanyEntity", "Company")
+                    b.HasOne("AuthenticationProvider.Models.Data.Entities.UserEntity", "User")
                         .WithMany()
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Company");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -426,7 +434,7 @@ namespace AuthenticationProvider.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.ApplicationUser", null)
+                    b.HasOne("AuthenticationProvider.Models.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -435,7 +443,7 @@ namespace AuthenticationProvider.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.ApplicationUser", null)
+                    b.HasOne("AuthenticationProvider.Models.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -450,7 +458,7 @@ namespace AuthenticationProvider.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AuthenticationProvider.Data.ApplicationUser", null)
+                    b.HasOne("AuthenticationProvider.Models.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -459,14 +467,14 @@ namespace AuthenticationProvider.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("AuthenticationProvider.Data.ApplicationUser", null)
+                    b.HasOne("AuthenticationProvider.Models.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AuthenticationProvider.Data.Entities.CompanyEntity", b =>
+            modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.UserEntity", b =>
                 {
                     b.Navigation("Addresses");
                 });

@@ -7,7 +7,7 @@
 //        public const string NotFound = "NOT_FOUND";
 //        public const string InvalidCredentials = "INVALID_CREDENTIALS";
 //        public const string TokenExpiredOrInvalid = "TOKEN_EXPIRED_OR_INVALID";
-//        public const string CompanyNotFound = "COMPANY_NOT_FOUND";
+//        public const string UserNotFound = "USER_NOT_FOUND";
 //        public const string EmailAlreadyInUse = "EMAIL_ALREADY_IN_USE";
 //        public const string EmailSendFailure = "EMAIL_SENDING_FAILED";
 //        public const string EmailNoTFound = "EMAIL_NOT_FOUND";

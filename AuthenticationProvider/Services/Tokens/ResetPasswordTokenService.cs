@@ -12,25 +12,23 @@ namespace AuthenticationProvider.Services.Tokens;
 public class ResetPasswordTokenService : IResetPasswordTokenService
 {
     private readonly IResetPasswordTokenRepository _resetPasswordTokenRepository;
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ResetPasswordTokenService> _logger;
-    private readonly PasswordHasher<CompanyEntity> _passwordHasher;
 
     public ResetPasswordTokenService(
         IResetPasswordTokenRepository resetPasswordTokenRepository,
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         IConfiguration configuration,
         ILogger<ResetPasswordTokenService> logger)
     {
         _resetPasswordTokenRepository = resetPasswordTokenRepository;
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _configuration = configuration;
         _logger = logger;
-        _passwordHasher = new PasswordHasher<CompanyEntity>();
     }
 
-    public async Task<string> GenerateResetPasswordTokenAsync(string email)
+    public async Task<object> GenerateResetPasswordTokenAsync(string email)
     {
         try
         {
@@ -40,15 +38,15 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 throw new ArgumentException("E-postadress är obligatorisk.");
             }
 
-            var company = await _companyRepository.GetByEmailAsync(email);
-            if (company == null)
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
             {
-                _logger.LogWarning("Company not found with email: {Email}", email);
+                _logger.LogWarning("User not found with email: {Email}", email);
                 throw new ArgumentException("Inget företag hittades med den angivna e-postadressen.");
             }
 
             // Delete previous token if any exists
-            await _resetPasswordTokenRepository.DeleteAsync(company.Id);
+            await _resetPasswordTokenRepository.DeleteAsync(user.UserId);
 
             var secretKey = _configuration["JwtResetPassword:Key"];
             var issuer = _configuration["JwtResetPassword:Issuer"];
@@ -67,10 +65,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                new Claim(ClaimTypes.NameIdentifier, company.Id.ToString()),
-                new Claim(ClaimTypes.Email, company.Email),
                 new Claim("token_type", "ResetPassword"),
-                new Claim(JwtRegisteredClaimNames.Aud, audience)
             }),
                 Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(30),
                 Issuer = issuer,
@@ -79,19 +74,22 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             };
 
             var jwtToken = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(jwtToken);
+            string tokenString = tokenHandler.WriteToken(jwtToken);
 
             var resetPasswordToken = new ResetPasswordTokenEntity
             {
+                Id = Guid.NewGuid(),
                 Token = tokenString,
-                CompanyId = company.Id,
-                ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(15),
+                UserId = user.UserId,
+                ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(31),
                 IsUsed = false
             };
 
             await _resetPasswordTokenRepository.CreateAsync(resetPasswordToken);
+            string tokenId = resetPasswordToken.ToString()!;
 
-            return tokenString;
+            // Returning both token string and token id, because it will validate the token before sending but it will send only token id
+            return new { TokenId = tokenId, TokenString = tokenString };
         }
         catch (ArgumentException ex)
         {
@@ -164,15 +162,27 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 ValidIssuer = issuer,
                 ValidAudience = audience,
                 IssuerSigningKey = securityKey,
-                ClockSkew = TimeSpan.Zero
+                ClockSkew = TimeSpan.Zero  // No tolerance for expired tokens
             };
 
-            tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            // Validate the token
+            var validatedToken = tokenHandler.ValidateToken(token, validationParameters, out var validated);
+            _logger.LogInformation("Token validated successfully.");
 
+            // Now check the token from the database (if it's not expired or used)
             var resetPasswordToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
-            if (resetPasswordToken == null || !resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")))
+            if (resetPasswordToken == null)
             {
-                _logger.LogWarning("Reset password token is invalid, used, or expired.");
+                _logger.LogWarning("Reset password token not found in the database.");
+                return false;
+            }
+
+            _logger.LogInformation("Reset password token found. Expiry Date: {ExpiryDate}", resetPasswordToken.ExpiryDate);
+
+            // Check if the token is used or expired
+            if (resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Reset password token is either used or expired.");
                 return false;
             }
 
@@ -189,4 +199,5 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             return false;
         }
     }
+
 }

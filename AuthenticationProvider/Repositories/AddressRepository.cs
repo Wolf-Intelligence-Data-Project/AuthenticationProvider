@@ -12,50 +12,50 @@ namespace AuthenticationProvider.Repositories;
 
 public class AddressRepository : IAddressRepository
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly UserDbContext _userDbContext;
     private readonly ILogger<AddressRepository> _logger;
 
-    public AddressRepository(ApplicationDbContext dbContext, ILogger<AddressRepository> logger)
+    public AddressRepository(UserDbContext dbContext, ILogger<AddressRepository> logger)
     {
-        _dbContext = dbContext;
+        _userDbContext = dbContext;
         _logger = logger;
     }
 
     /// <summary>
-    /// Adds a new address to the database with uniqueness checks for the same company.
+    /// Adds a new address to the database with uniqueness checks for the same user.
     /// </summary>
     /// <param name="address">The address entity to add.</param>
     public async Task AddAsync(AddressEntity address)
     {
         try
         {
-            // Ensure address uniqueness: Same street address, postal code, and city should not exist for the same company
-            bool isAddressUnique = !await _dbContext.Addresses
-                .AnyAsync(a => a.StreetAddress == address.StreetAddress
+            // Ensure address uniqueness: Same street address, postal code, and city should not exist for the same user
+            bool isAddressUnique = !await _userDbContext.Addresses
+                .AnyAsync(a => a.StreetAndNumber == address.StreetAndNumber
                                && a.PostalCode == address.PostalCode
                                && a.City == address.City
-                               && a.CompanyId == address.CompanyId);
+                               && a.UserId == address.UserId);
 
             if (!isAddressUnique)
             {
                 throw new InvalidOperationException("Adressen existerar redan i systemet.");
             }
 
-            // If adding a primary address, check if the company already has a primary address
+            // If adding a primary address, check if the user already has a primary address
             if (address.IsPrimary)
             {
-                bool hasPrimaryAddress = await _dbContext.Addresses
-                    .AnyAsync(a => a.CompanyId == address.CompanyId && a.IsPrimary);
+                bool hasPrimaryAddress = await _userDbContext.Addresses
+                    .AnyAsync(a => a.UserId == address.UserId && a.IsPrimary);
 
                 if (hasPrimaryAddress)
                 {
-                    throw new InvalidOperationException("Företaget har redan en primäradress.");
+                    throw new InvalidOperationException("Användaren har redan en primäradress.");
                 }
             }
 
             // Add the address to the database
-            await _dbContext.AddAsync(address);
-            await _dbContext.SaveChangesAsync();
+            await _userDbContext.AddAsync(address);
+            await _userDbContext.SaveChangesAsync();
         }
         catch (Exception ex)
         {
@@ -67,15 +67,15 @@ public class AddressRepository : IAddressRepository
     /// <summary>
     /// Retrieves an address by its ID.
     /// </summary>
-    /// <param name="id">The ID of the address to retrieve.</param>
+    /// <param name="addressId">The ID of the address to retrieve.</param>
     /// <returns>The address entity if found, otherwise null.</returns>
-    public async Task<AddressEntity> GetByIdAsync(int id)
+    public async Task<AddressEntity> GetByIdAsync(Guid addressId)
     {
         try
         {
-            return await _dbContext.Addresses
+            return await _userDbContext.Addresses
                                    .AsNoTracking()
-                                   .FirstOrDefaultAsync(a => a.Id == id);
+                                   .FirstOrDefaultAsync(a => a.AddressId == addressId);
         }
         catch (Exception ex)
         {
@@ -85,16 +85,16 @@ public class AddressRepository : IAddressRepository
     }
 
     /// <summary>
-    /// Retrieves all addresses for a specific company.
+    /// Retrieves all addresses for a specific user.
     /// </summary>
-    /// <param name="companyId">The ID of the company whose addresses to retrieve.</param>
+    /// <param name="userId">The ID of the user whose addresses to retrieve.</param>
     /// <returns>A collection of address entities.</returns>
-    public async Task<IEnumerable<AddressEntity>> GetAddressesByCompanyIdAsync(Guid companyId)
+    public async Task<IEnumerable<AddressEntity>> GetAddressesByUserIdAsync(Guid userId)
     {
         try
         {
-            return await _dbContext.Addresses
-                                    .Where(a => a.CompanyId == companyId)
+            return await _userDbContext.Addresses
+                                    .Where(a => a.UserId == userId)
                                     .ToListAsync();
         }
         catch (Exception ex)
@@ -115,17 +115,17 @@ public class AddressRepository : IAddressRepository
             // If updating to Primary address, ensure no other primary address exists
             if (address.IsPrimary)
             {
-                bool hasPrimaryAddress = await _dbContext.Addresses
-                    .AnyAsync(a => a.CompanyId == address.CompanyId && a.IsPrimary && a.Id != address.Id);
+                bool hasPrimaryAddress = await _userDbContext.Addresses
+                    .AnyAsync(a => a.UserId == address.UserId && a.IsPrimary && a.AddressId != address.AddressId);
 
                 if (hasPrimaryAddress)
                 {
-                    throw new InvalidOperationException("Företaget har redan en primäradress.");
+                    throw new InvalidOperationException("Användaren har redan en primäradress.");
                 }
             }
 
-            _dbContext.Addresses.Update(address);
-            await _dbContext.SaveChangesAsync();
+            _userDbContext.Addresses.Update(address);
+            await _userDbContext.SaveChangesAsync();
         }
         catch (Exception ex)
         {

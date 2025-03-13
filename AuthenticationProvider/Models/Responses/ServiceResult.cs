@@ -5,7 +5,7 @@ public enum ServiceResult
     Success,
     InvalidToken,
     EmailNotFound,
-    CompanyNotFound,
+    UserNotFound,
     AlreadyVerified,
     Failure
 }

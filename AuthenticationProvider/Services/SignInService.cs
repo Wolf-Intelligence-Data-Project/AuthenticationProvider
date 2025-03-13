@@ -6,33 +6,34 @@ using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using System;
 
 namespace AuthenticationProvider.Services;
 
 /// <summary>
-/// Service responsible for handling sign-in logic for company authentication.
+/// Service responsible for handling sign-in logic for user authentication.
 /// </summary>
 public class SignInService : ISignInService
 {
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IAccessTokenService _accessTokenService;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
     private readonly ILogger<SignInService> _logger;
 
     public SignInService(
-        ICompanyRepository companyRepository,
+        IUserRepository userRepository,
         IAccessTokenService accessTokenService,
         IPasswordHasher<ApplicationUser> passwordHasher,
         ILogger<SignInService> logger)
     {
-        _companyRepository = companyRepository ?? throw new ArgumentNullException(nameof(companyRepository));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _accessTokenService = accessTokenService ?? throw new ArgumentNullException(nameof(accessTokenService));
         _passwordHasher = passwordHasher ?? throw new ArgumentNullException(nameof(passwordHasher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Attempts to sign in a company using email and password.
+    /// Attempts to sign in a user using email and password.
     /// Validates the provided credentials and generates an access token upon successful authentication.
     /// </summary>
     /// <param name="signInDto">The sign-in request containing email and password.</param>
@@ -61,20 +62,20 @@ public class SignInService : ISignInService
 
         try
         {
-            // Retrieve the company by email
-            var companyEntity = await _companyRepository.GetByEmailAsync(signInRequest.Email);
-            if (companyEntity == null)
+            // Retrieve the user by email
+            var userEntity = await _userRepository.GetByEmailAsync(signInRequest.Email);
+            if (userEntity == null)
             {
-                _logger.LogWarning("Sign-in failed: Company not found for provided email.");
+                _logger.LogWarning("Sign-in failed: User not found for provided email.");
                 return new SignInResponse
                 {
                     Success = false,
-                    ErrorMessage = "Företaget finns inte."
+                    ErrorMessage = "Användaren finns inte."
                 };
             }
 
-            // Convert CompanyEntity to ApplicationUser for authentication
-            var applicationUser = MapToApplicationUser(companyEntity);
+            // Convert UserEntity to ApplicationUser for authentication
+            var applicationUser = MapToApplicationUser(userEntity);
 
             // Validate password
             if (!ValidatePassword(applicationUser, signInRequest.Password))
@@ -90,13 +91,17 @@ public class SignInService : ISignInService
             // Generate access token and store in HTTP-only cookie
             var token = _accessTokenService.GenerateAccessToken(applicationUser);
 
-            _logger.LogInformation("Company signed in successfully.");
+            _logger.LogInformation("User signed in successfully.");
+            _logger.LogInformation(applicationUser.Id);
             return new SignInResponse
             {
                 Success = true,
                 Message = "Inloggning lyckades.",
-                User = applicationUser // You may exclude the user if you only rely on the cookie
+                User = applicationUser, // You may exclude the user if you only rely on the cookie
+
             };
+            
+
         }
         catch (Exception ex)
         {
@@ -110,19 +115,19 @@ public class SignInService : ISignInService
     }
 
     /// <summary>
-    /// Maps a <see cref="CompanyEntity"/> to an <see cref="ApplicationUser"/> model.
+    /// Maps a <see cref="UserEntity"/> to an <see cref="ApplicationUser"/> model.
     /// </summary>
-    private ApplicationUser MapToApplicationUser(CompanyEntity companyEntity)
+    private ApplicationUser MapToApplicationUser(UserEntity userEntity)
     {
         return new ApplicationUser
         {
-            Id = companyEntity.Id.ToString(),
-            UserName = companyEntity.Email,
-            Email = companyEntity.Email,
-            PasswordHash = companyEntity.PasswordHash,
-            CompanyName = companyEntity.CompanyName,
-            OrganisationNumber = companyEntity.OrganizationNumber,
-            IsVerified = companyEntity.IsVerified
+            Id = userEntity.UserId.ToString(),
+            UserName = userEntity.Email,
+            Email = userEntity.Email,
+            PasswordHash = userEntity.PasswordHash,
+            CompanyName = userEntity.CompanyName,
+            IdentificationNumber = userEntity.IdentificationNumber,
+            IsVerified = userEntity.IsVerified
         };
     }
 

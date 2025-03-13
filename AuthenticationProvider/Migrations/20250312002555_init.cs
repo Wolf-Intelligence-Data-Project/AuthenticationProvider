@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AuthenticationProvider.Migrations
 {
     /// <inheritdoc />
-    public partial class Init : Migration
+    public partial class init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,9 +31,8 @@ namespace AuthenticationProvider.Migrations
                 {
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     CompanyName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    OrganisationNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IdentificationNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsVerified = table.Column<bool>(type: "bit", nullable: false),
-                    CompanyId = table.Column<int>(type: "int", nullable: true),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -52,6 +51,29 @@ namespace AuthenticationProvider.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IdentificationNumber = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    IsCompany = table.Column<bool>(type: "bit", nullable: true),
+                    CompanyName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    BusinessType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FullName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsVerified = table.Column<bool>(type: "bit", nullable: false),
+                    TermsAndConditions = table.Column<bool>(type: "bit", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    AdminNote = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PersonalDiscount = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.UserId);
                 });
 
             migrationBuilder.CreateTable(
@@ -165,7 +187,7 @@ namespace AuthenticationProvider.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CompanyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Token = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
@@ -173,52 +195,35 @@ namespace AuthenticationProvider.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AccountVerificationTokens", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AccountVerificationTokens_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
                 name: "Addresses",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    StreetAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    AddressId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    StreetAndNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PostalCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     City = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Region = table.Column<int>(type: "int", nullable: false),
-                    CompanyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AddressType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsPrimary = table.Column<bool>(type: "bit", nullable: false)
+                    Region = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Addresses", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Companies",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OrganisationNumber = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    CompanyName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    BusinessType = table.Column<int>(type: "int", nullable: false),
-                    ResponsiblePersonName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsVerified = table.Column<bool>(type: "bit", nullable: false),
-                    TermsAndConditions = table.Column<bool>(type: "bit", nullable: false),
-                    PrimaryAddressId = table.Column<int>(type: "int", nullable: true),
-                    PasswordHash = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Companies", x => x.Id);
+                    table.PrimaryKey("PK_Addresses", x => x.AddressId);
                     table.ForeignKey(
-                        name: "FK_Companies_Addresses_PrimaryAddressId",
-                        column: x => x.PrimaryAddressId,
-                        principalTable: "Addresses",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        name: "FK_Addresses_Users_AddressId",
+                        column: x => x.AddressId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -226,7 +231,7 @@ namespace AuthenticationProvider.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CompanyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Token = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
@@ -235,22 +240,17 @@ namespace AuthenticationProvider.Migrations
                 {
                     table.PrimaryKey("PK_ResetPasswordTokens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_ResetPasswordTokens_Companies_CompanyId",
-                        column: x => x.CompanyId,
-                        principalTable: "Companies",
-                        principalColumn: "Id",
+                        name: "FK_ResetPasswordTokens_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AccountVerificationTokens_CompanyId",
+                name: "IX_AccountVerificationTokens_UserId",
                 table: "AccountVerificationTokens",
-                column: "CompanyId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Addresses_CompanyId",
-                table: "Addresses",
-                column: "CompanyId");
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
@@ -292,43 +292,19 @@ namespace AuthenticationProvider.Migrations
                 filter: "[NormalizedUserName] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Companies_PrimaryAddressId",
-                table: "Companies",
-                column: "PrimaryAddressId",
-                unique: true,
-                filter: "[PrimaryAddressId] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ResetPasswordTokens_CompanyId",
+                name: "IX_ResetPasswordTokens_UserId",
                 table: "ResetPasswordTokens",
-                column: "CompanyId");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_AccountVerificationTokens_Companies_CompanyId",
-                table: "AccountVerificationTokens",
-                column: "CompanyId",
-                principalTable: "Companies",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_Addresses_Companies_CompanyId",
-                table: "Addresses",
-                column: "CompanyId",
-                principalTable: "Companies",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.Restrict);
+                column: "UserId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_Addresses_Companies_CompanyId",
-                table: "Addresses");
-
             migrationBuilder.DropTable(
                 name: "AccountVerificationTokens");
+
+            migrationBuilder.DropTable(
+                name: "Addresses");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoleClaims");
@@ -355,10 +331,7 @@ namespace AuthenticationProvider.Migrations
                 name: "AspNetUsers");
 
             migrationBuilder.DropTable(
-                name: "Companies");
-
-            migrationBuilder.DropTable(
-                name: "Addresses");
+                name: "Users");
         }
     }
 }

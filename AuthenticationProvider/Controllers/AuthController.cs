@@ -41,7 +41,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Authenticates a company using the provided credentials and returns an access token upon success.
+    /// Authenticates a user using the provided credentials and returns an access token upon success.
     /// </summary>
     /// <param name="request">The sign-in request containing login credentials.</param>
     /// <returns>Returns a success message if authentication succeeds, otherwise an error response.</returns>
@@ -80,7 +80,7 @@ public class AuthController : ControllerBase
             if (response.Success)
             {
                 _cache.Remove(cacheKey);
-                _logger.LogInformation("Login successful for: {CompanyEmail}", request.Email);
+                _logger.LogInformation("Login successful for: {UserEmail}", request.Email);
 
                 return Ok(new { message = "Inloggning lyckades." });
             }
@@ -93,18 +93,18 @@ public class AuthController : ControllerBase
                 return Unauthorized("För många försök. CAPTCHA krävs för nästa försök.");
             }
 
-            _logger.LogWarning("Login failed for: {CompanyEmail}", request.Email);
+            _logger.LogWarning("Login failed for: {UserEmail}", request.Email);
             return Unauthorized("Ogiltiga inloggningsuppgifter.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login attempt for: {CompanyEmail}", request.Email);
+            _logger.LogError(ex, "Error during login attempt for: {UserEmail}", request.Email);
             return StatusCode(500, "Ett internt fel uppstod.");
         }
     }
 
     /// <summary>
-    /// Logs out the currently authenticated company by revoking the access token.
+    /// Logs out the currently authenticated user by revoking the access token.
     /// </summary>
     /// <returns>Returns a success message upon successful logout.</returns>
     /// <response code="200">Logout successful.</response>
@@ -141,7 +141,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Checks the authentication status of the currently logged-in company.
+    /// Checks the authentication status of the currently logged-in user.
     /// </summary>
     /// <returns>Returns authentication and verification status.</returns>
     /// <response code="200">Returns authentication status.</response>

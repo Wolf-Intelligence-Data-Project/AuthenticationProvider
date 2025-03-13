@@ -4,12 +4,12 @@ using AuthenticationProvider.Models.Data.Requests;
 namespace AuthenticationProvider.Interfaces.Utilities;
 
 /// <summary>
-/// Handles the sign-in process for a company.
+/// Handles the sign-in process for a user.
 /// </summary>
 public interface ISignInService
 {
     /// <summary>
-    /// Authenticates a company based on the provided sign-in credentials.
+    /// Authenticates a user based on the provided sign-in credentials.
     /// </summary>
     /// <param name="signInDto">The sign-in credentials.</param>
     /// <returns>A response containing authentication details.</returns>

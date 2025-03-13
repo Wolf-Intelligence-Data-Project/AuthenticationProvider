@@ -1,4 +1,5 @@
-﻿using AuthenticationProvider.Interfaces.Utilities;
+﻿using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
@@ -24,16 +25,16 @@ public class SignUpController : ControllerBase
     }
 
     /// <summary>
-    /// Registers a new company in the system.
-    /// This endpoint accepts company details for creating a new company record and generating a verification token.
-    /// The provided data will be validated, and upon success, a company ID and verification token will be returned.
+    /// Registers a new user in the system.
+    /// This endpoint accepts user details for creating a new user record and generating a verification token.
+    /// The provided data will be validated, and upon success, a user ID and verification token will be returned.
     /// </summary>
-    /// <param name="request">The sign-up request containing the company's details, such as name, email, etc.</param>
-    /// <returns>A response containing the company ID and verification token if registration is successful, or an error message if validation fails.</returns>
+    /// <param name="request">The sign-up request containing the user's details, such as name, email, etc.</param>
+    /// <returns>A response containing the user ID and verification token if registration is successful, or an error message if validation fails.</returns>
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] SignUpRequest request)
     {
-        _logger.LogInformation("Register endpoint called with company data.");
+        _logger.LogInformation("Register endpoint called with user data.");
 
         if (!ModelState.IsValid)
         {
@@ -51,12 +52,12 @@ public class SignUpController : ControllerBase
         try
         {
             // Delegate registration logic to the SignUpService
-            var signUpResponse = await _signUpService.RegisterCompanyAsync(request);
+            var signUpResponse = await _signUpService.RegisterUserAsync(request);
 
-            _logger.LogInformation("Company registered successfully");
+            _logger.LogInformation("User registered successfully");
 
-            // Return success message with company ID and verification token
-            return Ok(new { message = "Företaget registrerat framgångsrikt!", data = new { companyId = signUpResponse.CompanyId, token = signUpResponse.Token } });
+            // Return success message with user ID and verification token
+            return Ok(new { message = "Användaren registrerat framgångsrikt!", data = new { userId = signUpResponse.UserId, token = signUpResponse.Token } });
         }
         catch (InvalidOperationException ex)
         {
@@ -76,42 +77,35 @@ public class SignUpController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a company based on the provided company ID.
-    /// This endpoint first attempts to sign out the company (invalidate session) and then deletes the company from the system.
-    /// It returns a success message or an error if the company was not found or if an issue occurred during deletion.
+    /// Deletes a user based on the provided user ID.
+    /// This endpoint first attempts to sign out the user (invalidate session) and then deletes the user from the system.
+    /// It returns a success message or an error if the user was not found or if an issue occurred during deletion.
     /// </summary>
-    /// <param name="companyId">The unique identifier of the company to be deleted.</param>
-    /// <returns>A success message upon successful deletion, or an error response if the company was not found or deletion failed.</returns>
-    [HttpDelete("delete/{companyId}")]
-    public async Task<IActionResult> DeleteCompany(Guid companyId)
+    /// <param name="userId">The unique identifier of the user to be deleted.</param>
+    /// <returns>A success message upon successful deletion, or an error response if the user was not found or deletion failed.</returns>
+    [HttpDelete("delete-user")]
+    public async Task<IActionResult> DeleteUser(DeleteRequest deleteRequest)
     {
-        _logger.LogInformation("DeleteCompany endpoint called");
+        _logger.LogInformation("DeleteUser endpoint called");
 
         try
         {
-            // Sign out the company (invalidate the session)
-            var signOutResult = await _signOutService.SignOutAsync(companyId.ToString());
-            if (!signOutResult)
-            {
-                _logger.LogWarning("Failed to sign out the company");
-            }
+            // Delete logic to the SignUpService
+            await _signUpService.DeleteUserAsync(deleteRequest);
 
-            // Delegate the actual delete logic to the SignUpService
-            await _signUpService.DeleteCompanyAsync(companyId);
-
-            _logger.LogInformation("Company with ID deleted successfully.");
+            _logger.LogInformation("User with ID deleted successfully.");
 
             // Return success message
-            return Ok(new { message = "Företaget har tagits bort framgångsrikt.", details = (string?)null });
+            return Ok(new { message = "Användaren har tagits bort framgångsrikt.", details = (string?)null });
         }
         catch (KeyNotFoundException ex)
         {
-            _logger.LogError("Company not found during deletion: {ErrorMessage}", ex.Message);
-            return NotFound(ErrorResponses.CompanyNotFound);
+            _logger.LogError("User not found during deletion: {ErrorMessage}", ex.Message);
+            return NotFound(ErrorResponses.UserNotFound);
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError("Error during company deletion: {ErrorMessage}", ex.Message);
+            _logger.LogError("Error during User deletion: {ErrorMessage}", ex.Message);
             return BadRequest(new
             {
                 ErrorCode = "DELETE_FAILED",
@@ -121,7 +115,7 @@ public class SignUpController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during company deletion.");
+            _logger.LogError(ex, "Unexpected error during user deletion.");
             return StatusCode(500, ErrorResponses.GeneralInternalError(ex));
         }
     }

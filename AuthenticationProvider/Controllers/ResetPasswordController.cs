@@ -3,10 +3,8 @@ using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Services.Tokens;
-using Microsoft.AspNetCore.Authorization;
 
 namespace AuthenticationProvider.Controllers;
-
 
 /// <summary>
 /// Controller responsible for managing password reset operations securely.
@@ -48,25 +46,29 @@ public class ResetPasswordController : ControllerBase
 
         try
         {
-            var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
-            if (string.IsNullOrEmpty(resetPasswordToken))
-            {
-                return StatusCode(500, ErrorResponses.TokenGenerationFailed);
-            }
+            await _resetPasswordService.CreateResetPasswordTokenAsync(email);
 
-            var emailSent = await _resetPasswordService.SendResetPasswordEmailAsync(resetPasswordToken);
-            if (!emailSent)
-            {
-                return StatusCode(500, new
-                {
-                    ErrorCode = "EMAIL_SEND_FAILED",
-                    ErrorMessage = "Misslyckades med att skicka e-post för lösenordsåterställning.",
-                    ErrorDetails = "Försök igen senare eller kontakta support."
-                });
-            }
+
+            //var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
+            //if (string.IsNullOrEmpty(resetPasswordToken))
+            //{
+            //    return StatusCode(500, ErrorResponses.TokenGenerationFailed);
+            //}
+
+            //var emailSent = await _resetPasswordService.SendResetPasswordEmailAsync(resetPasswordToken);
+            //if (!emailSent)
+            //{
+            //    return StatusCode(500, new
+            //    {
+            //        ErrorCode = "EMAIL_SEND_FAILED",
+            //        ErrorMessage = "Misslyckades med att skicka e-post för lösenordsåterställning.",
+            //        ErrorDetails = "Försök igen senare eller kontakta support."
+            //    });
+            //}
 
             return Ok(new { message = "En återställningstoken för lösenord har skickats till din e-postadress." });
         }
+       
         catch (ArgumentNullException ex)
         {
             _logger.LogError(ex, "ArgumentNullException while requesting reset password token.");
@@ -79,15 +81,20 @@ public class ResetPasswordController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while requesting reset password token.");
-            return StatusCode(500, ErrorResponses.GeneralInternalError(ex));
+            // Log the exception or handle it as needed
+            return StatusCode(500, new
+            {
+                ErrorCode = "EMAIL_SEND_FAILED",
+                ErrorMessage = "Misslyckades med att skicka e-post för lösenordsåterställning.",
+                ErrorDetails = "Försök igen senare eller kontakta support."
+            });
         }
     }
 
     /// <summary>
     /// Verifies the reset password token and redirects to the frontend for further processing.
     /// </summary>
-    [Authorize(Policy = "ResetPasswordToken")]
+    //[Authorize(Policy = "ResetPasswordToken")]
     [HttpGet("reset-password")]
     public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
     {
@@ -132,7 +139,7 @@ public class ResetPasswordController : ControllerBase
     /// <summary>
     /// Completes the password reset by verifying the token and updating the password if valid.
     /// </summary>
-    [Authorize(Policy = "ResetPasswordToken")]
+    //[Authorize(Policy = "ResetPasswordToken")]
     [HttpPost("reset-password/complete")]
     public async Task<IActionResult> CompleteResetPassword([FromBody] ResetPasswordRequest resetPasswordRequest)
     {

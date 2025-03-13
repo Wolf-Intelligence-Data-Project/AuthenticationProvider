@@ -10,17 +10,17 @@ namespace AuthenticationProvider.Services.Security;
 
 public class AccountSecurityService : IAccountSecurityService
 {
-    private readonly ICompanyRepository _companyRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IAccessTokenService _accessTokenService;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly ILogger<AccountSecurityService> _logger;
-    private readonly PasswordHasher<CompanyEntity> _passwordHasher;
+    private readonly PasswordHasher<UserEntity> _passwordHasher;
     private readonly IEmailRestrictionService _emailRestrictionService;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AccountSecurityService(
-    ICompanyRepository companyRepository,
+    IUserRepository userRepository,
     IAccessTokenService accessTokenService,
     IAccountVerificationTokenService accountVerificationTokenService,
     IAccountVerificationService accountVerificationService,
@@ -29,18 +29,18 @@ public class AccountSecurityService : IAccountSecurityService
     IEmailRestrictionService emailRestrictionService,
     IHttpContextAccessor httpContextAccessor)  // Add this line
     {
-        _companyRepository = companyRepository;
+        _userRepository = userRepository;
         _accessTokenService = accessTokenService;
         _accountVerificationTokenService = accountVerificationTokenService;
         _accountVerificationService = accountVerificationService;
         _logger = logger;
-        _passwordHasher = new PasswordHasher<CompanyEntity>();
+        _passwordHasher = new PasswordHasher<UserEntity>();
         _emailRestrictionService = emailRestrictionService;
         _httpContextAccessor = httpContextAccessor;  // Assign the injected IHttpContextAccessor
     }
 
     /// <summary>
-    /// Changes the email address of a company after validating the token and email restrictions.
+    /// Changes the email address of a user after validating the token and email restrictions.
     /// </summary>
     /// <param name="emailChangeRequest">The request containing the new email and the token for authentication.</param>
     /// <returns>True if the email is successfully changed, false otherwise.</returns>
@@ -79,24 +79,24 @@ public class AccountSecurityService : IAccountSecurityService
                 return false;
             }
 
-            // Get the company ID from the token
-            var companyIdString = _accessTokenService.GetUserIdFromToken(token);
-            if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
+            // Get the user ID from the token
+            var userIdString = _accessTokenService.GetUserIdFromToken(token);
+            if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
             {
-                _logger.LogWarning("Unable to retrieve or parse company ID from token.");
+                _logger.LogWarning("Unable to retrieve or parse user ID from token.");
                 return false;
             }
 
-            // Fetch the company from the database
-            var company = await _companyRepository.GetByIdAsync(companyId);
-            if (company == null)
+            // Fetch the user from the database
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
             {
-                _logger.LogWarning("Company not found for email change.");
+                _logger.LogWarning("User not found for email change.");
                 return false;
             }
 
             // Verify the current password before allowing email change
-            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(company, company.PasswordHash, emailChangeRequest.CurrentPassword);
+            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, emailChangeRequest.CurrentPassword);
             if (passwordVerificationResult == PasswordVerificationResult.Failed)
             {
                 _logger.LogWarning("Current password is incorrect.");
@@ -104,20 +104,20 @@ public class AccountSecurityService : IAccountSecurityService
             }
 
             // Check if the new email is already in use
-            var existingCompany = await _companyRepository.GetByEmailAsync(emailChangeRequest.Email);
-            if (existingCompany != null)
+            var existingUser = await _userRepository.GetByEmailAsync(emailChangeRequest.Email);
+            if (existingUser != null)
             {
                 _logger.LogWarning("Email is already in use.");
                 return false;
             }
 
-            // Set the company as unverified before changing the email
-            company.IsVerified = false;
-            company.Email = emailChangeRequest.Email;
-            await _companyRepository.UpdateAsync(company);
+            // Set the user as unverified before changing the email
+            user.IsVerified = false;
+            user.Email = emailChangeRequest.Email;
+            await _userRepository.UpdateAsync(user);
 
             // Generate a new verification token and send verification email
-            var verificationToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(companyId);
+            var verificationToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(userId);
             var tokenResult = await _accountVerificationService.SendVerificationEmailAsync(verificationToken);
 
             if (tokenResult != ServiceResult.Success)
@@ -137,7 +137,7 @@ public class AccountSecurityService : IAccountSecurityService
     }
 
     /// <summary>
-    /// Changes the password for a company after validating the token and password match.
+    /// Changes the password for a user after validating the token and password match.
     /// </summary>
     /// <param name="passwordChangeRequest">The request containing the new password, confirmation, and token for authentication.</param>
     /// <returns>True if the password is successfully changed, false otherwise.</returns>
@@ -179,24 +179,24 @@ public class AccountSecurityService : IAccountSecurityService
                 return false;
             }
 
-            // Get the company ID from the token
-            var companyIdString = _accessTokenService.GetUserIdFromToken(token);
-            if (string.IsNullOrEmpty(companyIdString) || !Guid.TryParse(companyIdString, out Guid companyId))
+            // Get the user ID from the token
+            var userIdString = _accessTokenService.GetUserIdFromToken(token);
+            if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
             {
-                _logger.LogWarning("Unable to retrieve or parse company ID from token.");
+                _logger.LogWarning("Unable to retrieve or parse user ID from token.");
                 return false;
             }
 
-            // Fetch the company from the database
-            var company = await _companyRepository.GetByIdAsync(companyId);
-            if (company == null)
+            // Fetch the user from the database
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
             {
-                _logger.LogWarning("Company not found for password change.");
+                _logger.LogWarning("User not found for password change.");
                 return false;
             }
 
             // Verify the current password before proceeding
-            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(company, company.PasswordHash, passwordChangeRequest.CurrentPassword);
+            var passwordVerificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, passwordChangeRequest.CurrentPassword);
             if (passwordVerificationResult == PasswordVerificationResult.Failed)
             {
                 _logger.LogWarning("Current password is incorrect.");
@@ -211,8 +211,8 @@ public class AccountSecurityService : IAccountSecurityService
             }
 
             // Hash and update password
-            company.PasswordHash = _passwordHasher.HashPassword(company, passwordChangeRequest.NewPassword);
-            await _companyRepository.UpdateAsync(company);
+            user.PasswordHash = _passwordHasher.HashPassword(user, passwordChangeRequest.NewPassword);
+            await _userRepository.UpdateAsync(user);
 
             _logger.LogInformation("Password successfully changed.");
             return true;

@@ -1,20 +1,30 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AuthenticationProvider.Models.Data.Entities;
 
 public class ResetPasswordTokenEntity
 {
-    [Required]
-    public Guid Id { get; set; } = Guid.NewGuid();
-    [Required]
-    public Guid CompanyId { get; set; }
-    [Required]
-    public string Token { get; set; }
-    [Required]
-    public DateTime ExpiryDate { get; set; }
-    [Required]
-    public bool IsUsed { get; set; } = false;
+    
+        [Key]
+        public Guid Id { get; set; }  // Primary Key for the token entity
 
-    [Required]
-    public CompanyEntity Company { get; set; }
+        [Required]
+        public Guid UserId { get; set; } // Explicit foreign key to UserEntity
+
+        [Required]
+        public string Token { get; set; } = null!;
+
+        [Required]
+        public string TokenType { get; set; } = "ResetPassword"; // You don't need to hide this
+
+        [Required]
+        public DateTime ExpiryDate { get; set; }
+
+        [Required]
+        public bool IsUsed { get; set; } = false;
+
+        [ForeignKey("UserId")] // Foreign key linking to UserEntity
+        [Required]
+        public UserEntity User { get; set; } = null!;
 }

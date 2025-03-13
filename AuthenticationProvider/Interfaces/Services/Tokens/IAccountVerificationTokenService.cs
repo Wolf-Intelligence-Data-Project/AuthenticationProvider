@@ -5,20 +5,20 @@ using Microsoft.AspNetCore.Mvc;
 namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
 /// <summary>
-/// Provides methods for managing account verification tokens for companies.
+/// Provides methods for managing account verification tokens for users.
 /// This service is responsible for generating, validating, marking as used, and deleting tokens
 /// related to account verification processes, ensuring secure and proper token management.
 /// </summary>
 public interface IAccountVerificationTokenService
 {
     /// <summary>
-    /// Generates a new account verification token for the specified company.
-    /// The token is used to verify the company's account and is associated with the company's email.
+    /// Generates a new account verification token for the specified user.
+    /// The token is used to verify the user's account and is associated with the user's email.
     /// The token will be valid for a limited period.
     /// </summary>
-    /// <param name="companyId">The unique identifier of the company requesting verification.</param>
+    /// <param name="userId">The unique identifier of the user requesting verification.</param>
     /// <returns>A string representing the generated token.</returns>
-    Task<string> GenerateAccountVerificationTokenAsync(Guid companyId);
+    Task<string> GenerateAccountVerificationTokenAsync(Guid userId);
 
     /// <summary>
     /// Validates the provided account verification token to ensure it is legitimate and not expired.

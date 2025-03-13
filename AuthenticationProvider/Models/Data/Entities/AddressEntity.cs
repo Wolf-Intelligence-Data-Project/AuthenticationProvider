@@ -5,11 +5,11 @@ namespace AuthenticationProvider.Models.Data.Entities;
 public class AddressEntity
 {
     [Key]
-    public int Id { get; set; }
+    public Guid AddressId { get; set; }
 
     [Required(ErrorMessage = "Gatuadress är obligatorisk.")]
     [RegularExpression(@"^([A-ZÅÄÖ][a-zåäö]*(?:\s[A-ZÅÄÖa-zåäö0-9]*)*)$", ErrorMessage = "Varje ord i gatuadressen måste börja med en stor bokstav och kan innehålla siffror.")]
-    public string StreetAddress { get; set; } = string.Empty;
+    public string StreetAndNumber { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Postnummer är obligatoriskt.")]
     [RegularExpression(@"^\d{3} \d{2}$", ErrorMessage = "Postnummer måste vara exakt 5 siffror och innehålla ett mellanslag efter tredje siffran.")]
@@ -24,8 +24,8 @@ public class AddressEntity
     public string Region { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Företags-ID är obligatoriskt.")]
-    public Guid CompanyId { get; set; }
+    public Guid UserId { get; set; }
 
-    public CompanyEntity? Company { get; set; }
+    public UserEntity? User { get; set; }
     public bool IsPrimary { get; set; }
 }

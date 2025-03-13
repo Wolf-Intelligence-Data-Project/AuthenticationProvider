@@ -27,7 +27,7 @@ public class PasswordChangeController : ControllerBase
     }
 
     /// <summary>
-    /// Change the password for the company using a valid token provided in the request.
+    /// Change the password for the user using a valid token provided in the request.
     /// </summary>
     /// <returns>Returns an action result indicating whether the password change was successful or not.</returns>
     //[HttpPatch("change-password")]

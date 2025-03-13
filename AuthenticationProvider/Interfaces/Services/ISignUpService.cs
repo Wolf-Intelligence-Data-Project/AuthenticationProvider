@@ -1,23 +1,23 @@
 ﻿using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses;
 
-namespace AuthenticationProvider.Interfaces.Utilities;
+namespace AuthenticationProvider.Interfaces.Services;
 
 /// <summary>
-/// Handles the sign-up process for a company.
+/// Handles the sign-up process for a user.
 /// </summary>
 public interface ISignUpService
 {
     /// <summary>
-    /// Registers a new company with the provided details.
+    /// Registers a new user with the provided details.
     /// </summary>
-    /// <param name="request">The company registration details.</param>
+    /// <param name="signInrequest">The user registration details.</param>
     /// <returns>A response containing the registration result.</returns>
-    Task<SignUpResponse> RegisterCompanyAsync(SignUpRequest request);
+    Task<SignUpResponse> RegisterUserAsync(SignUpRequest signInrequest);
 
     /// <summary>
-    /// Deletes a company by its unique identifier.
+    /// Deletes a user by its unique identifier.
     /// </summary>
-    /// <param name="companyId">The unique ID of the company to delete.</param>
-    Task DeleteCompanyAsync(Guid companyId);
+    /// <param name="userId">The unique ID of the user to delete.</param>
+    Task DeleteUserAsync(DeleteRequest deleteRequest);
 }

@@ -18,6 +18,7 @@ using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
 using AuthenticationProvider.Services.Security.Clients;
 using Microsoft.AspNetCore.HttpOverrides;
+using AuthenticationProvider.Interfaces.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,12 +27,12 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();  
 
 // Register DbContext with SQL Server
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<UserDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("UserDatabase")));
 
 // Register ASP.NET Core Identity services
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddEntityFrameworkStores<UserDbContext>()
     .AddDefaultTokenProviders();  // Registering Identity services
 
 // Register your application services
@@ -49,7 +50,7 @@ builder.Services.AddScoped<ISignInService, SignInService>();
 builder.Services.AddScoped<ISignUpService, SignUpService>();
 builder.Services.AddScoped<ISignOutService, SignOutService>();
 
-builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAddressRepository, AddressRepository>();
 
 
@@ -77,6 +78,7 @@ builder.Services.AddHttpClient<AccountVerificationClient>(client =>
 
 builder.Services.AddAuthentication(options =>
 {
+    // Default scheme for access tokens
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
@@ -94,7 +96,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
         ValidAudience = builder.Configuration["JwtAccess:Audience"],
         ClockSkew = TimeSpan.Zero,
-        ValidateLifetime = true  // Ensure token expiration is checked here as well
+        ValidateLifetime = true // Ensure token expiration is checked here as well
     };
 
     options.Events = new JwtBearerEvents
@@ -107,19 +109,9 @@ builder.Services.AddAuthentication(options =>
                 context.Fail("Kontot är inte verifierat.");
             }
             return Task.CompletedTask;
-        },
-        OnMessageReceived = context =>
-        {
-            var token = context.HttpContext.Request.Cookies["AccessToken"];
-            if (!string.IsNullOrEmpty(token))
-            {
-                context.Token = token;
-            }
-            return Task.CompletedTask;
         }
     };
 })
-
 
 // Reset Password Token Authentication
 .AddJwtBearer("ResetPassword", options =>
@@ -151,7 +143,7 @@ builder.Services.AddAuthentication(options =>
 })
 
 // Account Verification Token Authentication
-.AddJwtBearer("AccountVerification", options =>
+.AddJwtBearer("AccountVerificationPolicy", options =>
 {
     options.RequireHttpsMetadata = false;
     options.TokenValidationParameters = new TokenValidationParameters
@@ -174,23 +166,28 @@ builder.Services.AddAuthentication(options =>
             {
                 context.Fail("Invalid account verification token.");
             }
+
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            context.Fail("Authentication failed: " + context.Exception.Message);
             return Task.CompletedTask;
         }
     };
 });
-
-// Add Authorization policies
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AccessToken", policy =>
+    options.AddPolicy("AccessTokenPolicy", policy =>
         policy.RequireAuthenticatedUser().AddAuthenticationSchemes("Bearer"));
 
-    options.AddPolicy("ResetPasswordToken", policy =>
+    options.AddPolicy("ResetPasswordPolicy", policy =>
         policy.RequireAuthenticatedUser().AddAuthenticationSchemes("ResetPassword"));
 
-    options.AddPolicy("AccountVerificationToken", policy =>
-        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerification"));
+    options.AddPolicy("AccountVerificationPolicy", policy =>
+        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerificationPolicy"));
 });
+
 
 
 // HttpOnly cookie for access token
