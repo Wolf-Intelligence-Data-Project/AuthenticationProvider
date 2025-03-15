@@ -81,6 +81,9 @@ namespace AuthenticationProvider.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -123,7 +126,7 @@ namespace AuthenticationProvider.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AccountVerificationTokens", (string)null);
+                    b.ToTable("AccountVerificationTokens");
                 });
 
             modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AddressEntity", b =>

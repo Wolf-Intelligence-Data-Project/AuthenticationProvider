@@ -206,7 +206,7 @@ public class AccessTokenService : IAccessTokenService
 
     #region Helper Methods
 
-    public UserIpInfo GetUserIp()
+    private UserIpInfo GetUserIp()
     {
         var ipAddress = _httpContextAccessor.HttpContext?.Request?.Headers["X-Forwarded-For"].FirstOrDefault();
 
@@ -236,7 +236,6 @@ public class AccessTokenService : IAccessTokenService
             UserAgent = userAgent
         };
     }
-
     public string GetUserIdFromToken(string token)
     {
         try

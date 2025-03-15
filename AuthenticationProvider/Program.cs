@@ -19,6 +19,8 @@ using AuthenticationProvider.Interfaces.Services.Security.Clients;
 using AuthenticationProvider.Services.Security.Clients;
 using Microsoft.AspNetCore.HttpOverrides;
 using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Models.Data.Entities;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,7 +62,7 @@ builder.Services.AddScoped<IResetPasswordService, ResetPasswordService>();
 builder.Services.AddScoped<IResetPasswordClient, ResetPasswordClient>();
 
 builder.Services.AddSingleton<IEmailRestrictionService, EmailRestrictionService>();
-
+builder.Services.AddScoped<PasswordHasher<UserEntity>>();
 // Register HttpClient for ResetPasswordClient
 builder.Services.AddHttpClient<ResetPasswordClient>(client =>
 {
@@ -76,117 +78,191 @@ builder.Services.AddHttpClient<AccountVerificationClient>(client =>
     client.BaseAddress = new Uri(accountVerificationEndpoint);
 });
 
-builder.Services.AddAuthentication(options =>
-{
-    // Default scheme for access tokens
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
 
-// Access Token Authentication (Default)
-.AddJwtBearer("Bearer", options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.TokenValidationParameters = new TokenValidationParameters
+// Access Token Validation
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtAccess:Key"])),
-        ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
-        ValidAudience = builder.Configuration["JwtAccess:Audience"],
-        ClockSkew = TimeSpan.Zero,
-        ValidateLifetime = true // Ensure token expiration is checked here as well
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = context =>
+        options.RequireHttpsMetadata = false;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
-            if (isVerifiedClaim != "true")
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtAccess:Key"])),
+            ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
+            ValidAudience = builder.Configuration["JwtAccess:Audience"],
+            ClockSkew = TimeSpan.Zero, // No clock skew for strict expiration checks
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
             {
-                context.Fail("Kontot är inte verifierat.");
-            }
-            return Task.CompletedTask;
-        }
-    };
-})
-
-// Reset Password Token Authentication
-.AddJwtBearer("ResetPassword", options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtResetPassword:Key"])),
-        ValidIssuer = builder.Configuration["JwtResetPassword:Issuer"],
-        ValidAudience = builder.Configuration["JwtResetPassword:Audience"],
-        ClockSkew = TimeSpan.Zero,
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = context =>
-        {
-            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
-            if (tokenType != "ResetPassword")
+                var token = context.HttpContext.Request.Cookies["AccessToken"];
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token; // Set the token from the cookie for validation
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
             {
-                context.Fail("Invalid reset password token.");
-            }
-            return Task.CompletedTask;
-        }
-    };
-})
+                var claimsIdentity = context.Principal.Identity as ClaimsIdentity;
 
-// Account Verification Token Authentication
-.AddJwtBearer("AccountVerificationPolicy", options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtVerification:Key"])),
-        ValidIssuer = builder.Configuration["JwtVerification:Issuer"],
-        ValidAudience = builder.Configuration["JwtVerification:Audience"],
-        ClockSkew = TimeSpan.Zero,
-    };
+                if (claimsIdentity == null)
+                {
+                    context.Fail("Token är ogiltigt. Claims identity är null."); // Swedish message
+                    return Task.CompletedTask;
+                }
 
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = context =>
-        {
-            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
-            if (tokenType != "AccountVerification")
+                // Validate 'isVerified' claim
+                var isVerifiedClaim = claimsIdentity.FindFirst("isVerified");
+
+                if (isVerifiedClaim == null)
+                {
+                    context.Fail("Token är ogiltigt. Saknar 'isVerified' claim."); // Swedish message
+                    return Task.CompletedTask;
+                }
+
+                if (isVerifiedClaim.Value != "true")
+                {
+                    context.Fail("Token är ogiltigt. Användaren är inte verifierad."); // Swedish message
+                    return Task.CompletedTask;
+                }
+
+                // Log success after validation (log only non-sensitive data)
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Token validerades framgångsrikt för användare {UserName}.", claimsIdentity.Name);
+
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
             {
-                context.Fail("Invalid account verification token.");
+                // Log the error, including stack trace for better diagnostics
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError($"Autentisering misslyckades: {context.Exception.Message}"); // Swedish message
+                if (context.Exception.StackTrace != null)
+                {
+                    logger.LogError(context.Exception.StackTrace);
+                }
+
+                return Task.CompletedTask;
             }
+        };
+    });
 
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            context.Fail("Authentication failed: " + context.Exception.Message);
-            return Task.CompletedTask;
-        }
-    };
-});
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AccessTokenPolicy", policy =>
-        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("Bearer"));
+//builder.Services.AddAuthentication(options =>
+//{
+//    // Default scheme for access tokens
+//    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+//    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+//})
 
-    options.AddPolicy("ResetPasswordPolicy", policy =>
-        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("ResetPassword"));
+//// Access Token Authentication (Default)
+//.AddJwtBearer("Bearer", options =>
+//{
+//    options.RequireHttpsMetadata = false;
+//    options.TokenValidationParameters = new TokenValidationParameters
+//    {
+//        ValidateIssuer = true,
+//        ValidateAudience = true,
+//        ValidateIssuerSigningKey = true,
+//        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtAccess:Key"])),
+//        ValidIssuer = builder.Configuration["JwtAccess:Issuer"],
+//        ValidAudience = builder.Configuration["JwtAccess:Audience"],
+//        ClockSkew = TimeSpan.Zero,
+//        ValidateLifetime = true // Ensure token expiration is checked here as well
+//    };
 
-    options.AddPolicy("AccountVerificationPolicy", policy =>
-        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerificationPolicy"));
-});
+//    options.Events = new JwtBearerEvents
+//    {
+//        OnTokenValidated = context =>
+//        {
+//            var isVerifiedClaim = context.Principal?.FindFirst("isVerified")?.Value;
+//            if (isVerifiedClaim != "true")
+//            {
+//                context.Fail("Kontot är inte verifierat.");
+//            }
+//            return Task.CompletedTask;
+//        }
+//    };
+//})
+
+//// Reset Password Token Authentication
+//.AddJwtBearer("ResetPassword", options =>
+//{
+//    options.RequireHttpsMetadata = false;
+//    options.TokenValidationParameters = new TokenValidationParameters
+//    {
+//        ValidateIssuer = true,
+//        ValidateAudience = true,
+//        ValidateIssuerSigningKey = true,
+//        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtResetPassword:Key"])),
+//        ValidIssuer = builder.Configuration["JwtResetPassword:Issuer"],
+//        ValidAudience = builder.Configuration["JwtResetPassword:Audience"],
+//        ClockSkew = TimeSpan.Zero,
+//    };
+
+//    options.Events = new JwtBearerEvents
+//    {
+//        OnTokenValidated = context =>
+//        {
+//            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+//            if (tokenType != "ResetPassword")
+//            {
+//                context.Fail("Invalid reset password token.");
+//            }
+//            return Task.CompletedTask;
+//        }
+//    };
+//})
+
+//// Account Verification Token Authentication
+//.AddJwtBearer("AccountVerificationPolicy", options =>
+//{
+//    options.RequireHttpsMetadata = false;
+//    options.TokenValidationParameters = new TokenValidationParameters
+//    {
+//        ValidateIssuer = true,
+//        ValidateAudience = true,
+//        ValidateIssuerSigningKey = true,
+//        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtVerification:Key"])),
+//        ValidIssuer = builder.Configuration["JwtVerification:Issuer"],
+//        ValidAudience = builder.Configuration["JwtVerification:Audience"],
+//        ClockSkew = TimeSpan.Zero,
+//    };
+
+//    options.Events = new JwtBearerEvents
+//    {
+//        OnTokenValidated = context =>
+//        {
+//            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+//            if (tokenType != "AccountVerification")
+//            {
+//                context.Fail("Invalid account verification token.");
+//            }
+
+//            return Task.CompletedTask;
+//        },
+//        OnAuthenticationFailed = context =>
+//        {
+//            context.Fail("Authentication failed: " + context.Exception.Message);
+//            return Task.CompletedTask;
+//        }
+//    };
+//});
+//builder.Services.AddAuthorization(options =>
+//{
+//    options.AddPolicy("AccessTokenPolicy", policy =>
+//        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("Bearer"));
+
+//    options.AddPolicy("ResetPasswordPolicy", policy =>
+//        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("ResetPassword"));
+
+//    options.AddPolicy("AccountVerificationPolicy", policy =>
+//        policy.RequireAuthenticatedUser().AddAuthenticationSchemes("AccountVerificationPolicy"));
+//});
 
 
 

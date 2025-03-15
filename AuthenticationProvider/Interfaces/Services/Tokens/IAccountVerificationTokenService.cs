@@ -1,4 +1,5 @@
-﻿using AuthenticationProvider.Models.Data.Entities;
+﻿using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Models.Data.Requests;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +19,7 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="userId">The unique identifier of the user requesting verification.</param>
     /// <returns>A string representing the generated token.</returns>
-    Task<string> GenerateAccountVerificationTokenAsync(Guid userId);
+    Task<TokenInfo> GenerateAccountVerificationTokenAsync(Guid userId);
 
     /// <summary>
     /// Validates the provided account verification token to ensure it is legitimate and not expired.
@@ -26,7 +27,7 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="request">The request containing the token to be validated.</param>
     /// <returns>A response indicating whether the token is valid or expired, along with appropriate status codes.</returns>
-    Task<IActionResult> ValidateAccountVerificationTokenAsync(string token);
+    Task<bool> ValidateAccountVerificationTokenAsync(string tokenId);
 
     /// <summary>
     /// Marks the specified account verification token as used. Once marked, the token can no longer be used for verification.
@@ -34,13 +35,13 @@ public interface IAccountVerificationTokenService
     /// </summary>
     /// <param name="token">The token that needs to be marked as used.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task MarkAccountVerificationTokenAsUsedAsync(string token);
+    Task MarkAccountVerificationTokenAsUsedAsync(Guid tokenId);
 
     /// <summary>
     /// Retrieves the account verification token if it is still valid and not expired or used.
     /// If the token has been used or expired, it will return null.
     /// </summary>
-    /// <param name="token">The token to be retrieved for validation.</param>
+    /// <param name="verificationId">The token to be retrieved for validation.</param>
     /// <returns>A task representing the asynchronous operation, with the account verification token entity if valid, otherwise null.</returns>
-    Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string token);
+    Task<AccountVerificationTokenEntity> GetValidAccountVerificationTokenAsync(string verificationId);
 }

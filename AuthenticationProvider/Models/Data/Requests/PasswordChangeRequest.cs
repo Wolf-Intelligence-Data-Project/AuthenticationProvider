@@ -18,7 +18,7 @@ public class PasswordChangeRequest
 
     [Required(ErrorMessage = "Bekräfta lösenord krävs.")]
     [DataType(DataType.Password)]
-    [Compare("Password", ErrorMessage = "Lösenorden matchar inte.")]
+    [Compare("NewPassword", ErrorMessage = "Lösenorden matchar inte.")]
     public string ConfirmPassword { get; set; } = null!;
 
 }

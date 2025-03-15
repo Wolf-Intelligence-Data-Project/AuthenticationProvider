@@ -1,11 +1,10 @@
 ﻿using AuthenticationProvider.Interfaces.Repositories;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text;
 using AuthenticationProvider.Models.Data.Entities;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using AuthenticationProvider.Models;
 
 namespace AuthenticationProvider.Services.Tokens;
 
@@ -28,7 +27,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         _logger = logger;
     }
 
-    public async Task<object> GenerateResetPasswordTokenAsync(string email)
+    public async Task<TokenInfo> GenerateResetPasswordTokenAsync(string email)
     {
         try
         {
@@ -61,13 +60,10 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var tokenHandler = new JwtSecurityTokenHandler();
+            var expiration = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(30);
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                new Claim("token_type", "ResetPassword"),
-            }),
-                Expires = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(30),
+                Expires = expiration,
                 Issuer = issuer,
                 Audience = audience,
                 SigningCredentials = credentials
@@ -81,15 +77,19 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 Id = Guid.NewGuid(),
                 Token = tokenString,
                 UserId = user.UserId,
-                ExpiryDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm")).AddMinutes(31),
+                ExpiryDate = expiration,
                 IsUsed = false
             };
 
             await _resetPasswordTokenRepository.CreateAsync(resetPasswordToken);
-            string tokenId = resetPasswordToken.ToString()!;
+            string tokenId = resetPasswordToken.Id.ToString();
 
-            // Returning both token string and token id, because it will validate the token before sending but it will send only token id
-            return new { TokenId = tokenId, TokenString = tokenString };
+            // Return a structured object instead of just a tokenId
+            return new TokenInfo
+            {
+                TokenId = tokenId,
+                TokenString = tokenString
+            };
         }
         catch (ArgumentException ex)
         {
@@ -103,52 +103,60 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         }
     }
 
-    public async Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token)
+    public async Task<bool> ValidateResetPasswordTokenAsync(string tokenId)
     {
-        if (!await ValidateResetPasswordTokenAsync(token))
+        if (string.IsNullOrWhiteSpace(tokenId))
         {
-            throw new ArgumentException("Tokenet är ogiltigt eller har löpt ut.");
+            _logger.LogWarning("Token ID is null or empty.");
+            return false;
         }
 
-        return await _resetPasswordTokenRepository.GetByTokenAsync(token);
-    }
+        // Clean up tokenId by trimming any extra spaces
+        tokenId = tokenId.Trim();
 
-    public async Task MarkResetPasswordTokenAsUsedAsync(Guid tokenId)
-    {
-        try
-        {
-            var resetPasswordToken = await _resetPasswordTokenRepository.GetByIdAsync(tokenId);
-            if (resetPasswordToken == null || !await ValidateResetPasswordTokenAsync(resetPasswordToken.Token))
-            {
-                _logger.LogWarning("The reset password token is invalid or does not exist.");
-                return;
-            }
+        _logger.LogInformation("Attempting to parse TokenId: {TokenId}", tokenId);
 
-            resetPasswordToken.IsUsed = true;
-            await _resetPasswordTokenRepository.MarkAsUsedAsync(resetPasswordToken.Id);
-        }
-        catch (Exception ex)
+        // Try to parse the tokenId as a GUID
+        if (!Guid.TryParse(tokenId, out Guid parsedTokenId))
         {
-            throw new InvalidOperationException("Ett fel uppstod vid markering av token som använd.");
-        }
-    }
-
-    public async Task<bool> ValidateResetPasswordTokenAsync(string token)
-    {
-        if (string.IsNullOrEmpty(token))
-        {
-            _logger.LogWarning("Token is null or empty.");
+            _logger.LogWarning("Invalid token ID format: {TokenId}", tokenId);
             return false;
         }
 
         try
         {
+            var resetPasswordToken = await _resetPasswordTokenRepository.GetByIdAsync(parsedTokenId);
+
+            // Check if the token exists
+            if (resetPasswordToken == null)
+            {
+                _logger.LogWarning("No reset password token found for tokenId: {TokenId}", tokenId);
+                return false; // Token not found
+            }
+
+            // Perform additional checks: expiry and usage status
+            var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
+
+            // Check if the token has expired or if it is already used
+            if (resetPasswordToken.ExpiryDate <= stockholmTime || resetPasswordToken.IsUsed)
+            {
+                _logger.LogWarning("Reset password token expired or already used for tokenId: {TokenId}", tokenId);
+                return false; // Invalid token
+            }
+            string token = resetPasswordToken.Token.ToString();
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("Token is null or empty.");
+                return false;
+            }
+
             var secretKey = _configuration["JwtResetPassword:Key"];
             var issuer = _configuration["JwtResetPassword:Issuer"];
             var audience = _configuration["JwtResetPassword:Audience"];
 
             if (string.IsNullOrEmpty(secretKey) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
             {
+                _logger.LogError("JWT settings are missing from configuration.");
                 throw new ArgumentNullException("JWT settings are missing in configuration.");
             }
 
@@ -169,8 +177,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             var validatedToken = tokenHandler.ValidateToken(token, validationParameters, out var validated);
             _logger.LogInformation("Token validated successfully.");
 
-            // Now check the token from the database (if it's not expired or used)
-            var resetPasswordToken = await _resetPasswordTokenRepository.GetByTokenAsync(token);
+            // Now check the token taken from the database (if it's not expired or used)
             if (resetPasswordToken == null)
             {
                 _logger.LogWarning("Reset password token not found in the database.");
@@ -180,7 +187,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             _logger.LogInformation("Reset password token found. Expiry Date: {ExpiryDate}", resetPasswordToken.ExpiryDate);
 
             // Check if the token is used or expired
-            if (resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < DateTime.UtcNow)
+            if (resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < stockholmTime)
             {
                 _logger.LogWarning("Reset password token is either used or expired.");
                 return false;
@@ -200,4 +207,40 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         }
     }
 
+    public async Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string tokenId)
+    {
+        if (!Guid.TryParse(tokenId, out Guid parsedTokenId))
+        {
+            throw new ArgumentException("Ogiltig token-id.");
+        }
+
+        var resetPasswordToken = await _resetPasswordTokenRepository.GetByIdAsync(parsedTokenId);
+
+        if (resetPasswordToken == null || !await ValidateResetPasswordTokenAsync(tokenId))
+        {
+            throw new ArgumentException("Tokenet är ogiltigt eller har löpt ut.");
+        }
+
+        return resetPasswordToken;
+    }
+
+    public async Task MarkResetPasswordTokenAsUsedAsync(Guid tokenId)
+    {
+        try
+        {
+            var resetPasswordToken = await _resetPasswordTokenRepository.GetByIdAsync(tokenId);
+            if (resetPasswordToken == null || !await ValidateResetPasswordTokenAsync(tokenId.ToString()))
+            {
+                _logger.LogWarning("The reset password token is invalid or does not exist.");
+                return;
+            }
+
+            resetPasswordToken.IsUsed = true;
+            await _resetPasswordTokenRepository.MarkAsUsedAsync(resetPasswordToken.Id);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Ett fel uppstod vid markering av token som använd.");
+        }
+    }
 }

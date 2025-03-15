@@ -12,6 +12,6 @@ public class ApplicationUser : IdentityUser
     public string IdentificationNumber { get; set; } = string.Empty;
     public bool IsVerified { get; set; } = false;
 
-    //// Other properties
-    //public int? UserId { get; set; }
+    // Other properties
+    public Guid UserId { get; set; }
 };

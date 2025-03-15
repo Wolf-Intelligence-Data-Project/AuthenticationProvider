@@ -1,4 +1,6 @@
-﻿namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
+﻿using AuthenticationProvider.Models.Data.Requests;
+
+namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
 
 /// <summary>
 /// Defines a contract for an external client responsible for sending 
@@ -13,5 +15,5 @@ public interface IResetPasswordClient
     /// </summary>
     /// <param name="resetId">A unique token used to authorize the password reset request.</param>
     /// <returns>True if the request was successfully processed by the provider; otherwise, false.</returns>
-    Task<bool> SendResetPasswordEmailAsync(string resetId);
+    Task<bool> SendResetPasswordEmailAsync(SendResetPasswordRequest sendResetPasswordRequest);
 }

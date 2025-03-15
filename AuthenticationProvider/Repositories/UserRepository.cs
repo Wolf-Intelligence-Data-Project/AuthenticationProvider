@@ -117,15 +117,22 @@ public class UserRepository : IUserRepository
     /// </summary>
     /// <param name="userId">The unique ID of the user.</param>
     /// <returns>The user entity if found, otherwise null.</returns>
-    public async Task<UserEntity> GetByIdAsync(Guid userId)
+    public async Task<UserEntity?> GetByIdAsync(Guid userId)
     {
         try
         {
-            return await _userDbContext.Set<UserEntity>().FirstOrDefaultAsync(c => c.UserId == userId);
+            var user = await _userDbContext.Set<UserEntity>().FindAsync(userId);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+            }
+
+            return user;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving user by ID.");
+            _logger.LogError(ex, "Error retrieving user by ID {UserId}.", userId);
             throw;
         }
     }

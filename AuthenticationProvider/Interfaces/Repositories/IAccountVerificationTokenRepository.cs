@@ -1,5 +1,4 @@
 ﻿using AuthenticationProvider.Models.Data.Entities;
-using Microsoft.Extensions.Primitives;
 
 namespace AuthenticationProvider.Interfaces.Repositories;
 
@@ -9,7 +8,7 @@ public interface IAccountVerificationTokenRepository
 
     Task<AccountVerificationTokenEntity> GetByTokenAsync(string token);
 
-    Task<AccountVerificationTokenEntity> GetTokenByIdAsync(Guid tokenId);
+    Task<AccountVerificationTokenEntity> GetByIdAsync(Guid tokenId);
 
     Task MarkAsUsedAsync(Guid tokenId);
 

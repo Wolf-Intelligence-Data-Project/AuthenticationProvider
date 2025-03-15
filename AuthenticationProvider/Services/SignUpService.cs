@@ -21,7 +21,7 @@ public class SignUpService : ISignUpService
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly IAddressRepository _addressRepository;
     private readonly ILogger<SignUpService> _logger;
-    private readonly IPasswordHasher<UserEntity> _passwordHasher;
+    private readonly PasswordHasher<UserEntity> _passwordHasher;
     private readonly IEmailRestrictionService _emailRestrictionService;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IAccessTokenService _accessTokenService;
@@ -36,7 +36,8 @@ public class SignUpService : ISignUpService
         IEmailRestrictionService emailRestrictionService,
         IHttpContextAccessor httpContextAccessor,
         IAccessTokenService accessTokenService,
-        ISignOutService signOutService)
+        ISignOutService signOutService,
+        PasswordHasher<UserEntity> passwordHasher)
     {
         _userRepository = userRepository;
         _accountVerificationTokenService = accountVerificationTokenService;
@@ -87,11 +88,10 @@ public class SignUpService : ISignUpService
         // Add the primary and additional addresses
         await AddAddressesAsync(request, user);
 
-        // Generate an account verification token
-        var token = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(user.UserId);
+
 
         // Send the verification email
-        var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
+        var emailSent = await _accountVerificationService.SendVerificationEmailAsync(user.UserId.ToString());
         if (emailSent != ServiceResult.Success)
         {
             throw new InvalidOperationException("Det gick inte att skicka verifieringsmail.");
@@ -100,14 +100,11 @@ public class SignUpService : ISignUpService
         return new SignUpResponse
         {
             Success = true,
-            UserId = user.UserId,
-            Token = token
+            UserId = user.UserId
         };
     }
     public async Task DeleteUserAsync(DeleteRequest deleteRequest)
     {
-      
-
         var token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"];
         var userIdString = _accessTokenService.GetUserIdFromToken(token!);
         var password = deleteRequest.Password;
@@ -116,13 +113,15 @@ public class SignUpService : ISignUpService
         {
             throw new InvalidOperationException("Ogiltigt användar-ID.");
         }
+
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null)
         {
             throw new InvalidOperationException("Användaren hittades inte.");
         }
+        // Verify the plain-text password using the injected PasswordHasher
 
-        var passwordMatch = _passwordHasher.VerifyHashedPassword(user, password, user.PasswordHash);
+        var passwordMatch = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (passwordMatch != PasswordVerificationResult.Success)
         {
             throw new UnauthorizedAccessException("Ogiltigt lösenord.");
@@ -133,10 +132,11 @@ public class SignUpService : ISignUpService
         {
             _logger.LogWarning("Failed to sign out the user");
         }
-       
+
         await _userRepository.DeleteAsync(userId);
         _logger.LogInformation($"Användaren med ID {userId} har raderats.");
     }
+
 
     private async Task AddAddressesAsync(SignUpRequest request, UserEntity user)
     {

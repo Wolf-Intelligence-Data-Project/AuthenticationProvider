@@ -1,5 +1,4 @@
 ﻿using AuthenticationProvider.Models.Data;
-using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Interfaces.Services.Tokens;
 

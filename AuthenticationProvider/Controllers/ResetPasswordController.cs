@@ -48,24 +48,6 @@ public class ResetPasswordController : ControllerBase
         {
             await _resetPasswordService.CreateResetPasswordTokenAsync(email);
 
-
-            //var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
-            //if (string.IsNullOrEmpty(resetPasswordToken))
-            //{
-            //    return StatusCode(500, ErrorResponses.TokenGenerationFailed);
-            //}
-
-            //var emailSent = await _resetPasswordService.SendResetPasswordEmailAsync(resetPasswordToken);
-            //if (!emailSent)
-            //{
-            //    return StatusCode(500, new
-            //    {
-            //        ErrorCode = "EMAIL_SEND_FAILED",
-            //        ErrorMessage = "Misslyckades med att skicka e-post för lösenordsåterställning.",
-            //        ErrorDetails = "Försök igen senare eller kontakta support."
-            //    });
-            //}
-
             return Ok(new { message = "En återställningstoken för lösenord har skickats till din e-postadress." });
         }
        
@@ -96,25 +78,17 @@ public class ResetPasswordController : ControllerBase
     /// </summary>
     //[Authorize(Policy = "ResetPasswordToken")]
     [HttpGet("reset-password")]
-    public async Task<IActionResult> ResetPasswordPage([FromQuery] string token)
+    public async Task<IActionResult> ResetPasswordPage([FromQuery] string reset)
     {
-        if (string.IsNullOrEmpty(token))
+        if (string.IsNullOrEmpty(reset))
         {
             _logger.LogWarning("Reset password link clicked without a token.");
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
-        // Extra check of the token before starting a process (where it checks again)
-        var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(token);
-        if (!isTokenValid)
-        {
-            _logger.LogWarning("Account verification token is invalid, used, or expired.");
-            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
-        }
-
         try
         {
-            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(token);
+            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(reset);
             if (resetPasswordToken == null)
             {
                 _logger.LogWarning("Invalid or expired token accessed.");
@@ -122,7 +96,7 @@ public class ResetPasswordController : ControllerBase
             }
 
             _logger.LogInformation("Valid token accessed");
-            return Redirect($"{_frontendUrl}/reset-password?token={token}");
+            return Redirect($"{_frontendUrl}/reset-password?token={reset}");
         }
         catch (ArgumentNullException ex)
         {
@@ -149,7 +123,7 @@ public class ResetPasswordController : ControllerBase
         }
 
         // Extra check of the token before starting a process (where it checks again)
-        var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetPasswordRequest.Token);
+        var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetPasswordRequest.ResetId);
         if (!isTokenValid)
         {
             _logger.LogWarning("Account verification token is invalid, used, or expired.");

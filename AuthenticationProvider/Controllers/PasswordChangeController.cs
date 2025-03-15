@@ -11,7 +11,6 @@ namespace AuthenticationProvider.Controllers;
 /// <summary>
 /// Controller responsible for handling password change requests and operations.
 /// </summary>
-[Authorize(Policy = "AccessToken")]
 [Route("api/[controller]")]
 [ApiController]
 
@@ -85,8 +84,17 @@ public class PasswordChangeController : ControllerBase
     [HttpPatch("change-password")]
     public async Task<IActionResult> ChangePasswordAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors)
+                                          .Select(e => e.ErrorMessage);
+            _logger.LogWarning($"Model validation failed: {string.Join("; ", errors)}");
+
+            return BadRequest(new { errors });
+        }
         using var reader = new StreamReader(Request.Body, Encoding.UTF8);
         string rawBody = await reader.ReadToEndAsync();
+
         _logger.LogInformation($"Raw Request Body: {rawBody}");
 
         PasswordChangeRequest request;

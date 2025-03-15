@@ -2,9 +2,8 @@
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Utilities.Security;
+using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -14,58 +13,59 @@ public class AccountVerificationService : IAccountVerificationService
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
     private readonly IAccountVerificationClient _accountVerificationClient;
     private readonly IUserRepository _userRepository;
-    private readonly ILogger<AccountVerificationService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AccountVerificationService> _logger;
 
     public AccountVerificationService(
         IAccountVerificationTokenRepository accountVerificationTokenRepository,
         IAccountVerificationTokenService accountVerificationTokenService,
         IAccountVerificationClient accountVerificationClient,
         IUserRepository userRepository,
-        ILogger<AccountVerificationService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<AccountVerificationService> logger)
     {
         _accountVerificationTokenRepository = accountVerificationTokenRepository;
         _accountVerificationClient = accountVerificationClient;
         _accountVerificationTokenService = accountVerificationTokenService;
         _userRepository = userRepository;
-        _logger = logger;
         _configuration = configuration;
+        _logger = logger;      
     }
 
-    public async Task<ServiceResult> SendVerificationEmailAsync(string token)
+    public async Task<ServiceResult> SendVerificationEmailAsync(string userId)
     {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            _logger.LogError("Token is null or empty.");
-            return ServiceResult.InvalidToken;  // Returning InvalidToken on failure
-        }
-
         try
         {
-            if (!await EmailValidation(token))
+            if (!Guid.TryParse(userId, out Guid userGuid))
             {
-                _logger.LogWarning("The email in the token does not match any user.");
-                return ServiceResult.EmailNotFound;
+                throw new ArgumentException("Invalid user ID format");
             }
 
-            var result = await _accountVerificationClient.SendVerificationEmailAsync(token);
+            var tokenInfo = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(userGuid);
+
+            var verification = new SendVerificationRequest
+            {
+                VerificationId = tokenInfo.TokenId  // Ensure we are using TokenId here
+            };
+
+            bool result = await _accountVerificationClient.SendVerificationEmailAsync(verification);
+
             if (!result)
             {
                 _logger.LogError("Failed to send email.");
-                return ServiceResult.InvalidToken;  // Handle failure properly
+                return ServiceResult.InvalidToken; 
             }
 
-            return ServiceResult.Success;  // Return success if email was sent
+            return ServiceResult.Success; 
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending verification email");
-            return ServiceResult.InvalidToken;  // Return failure on exception
+            return ServiceResult.InvalidToken;
         }
     }
 
-    public async Task<ServiceResult> VerifyEmailAsync(string token)
+    public async Task<ServiceResult> VerifyAccountAsync(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -100,8 +100,12 @@ public class AccountVerificationService : IAccountVerificationService
         user.IsVerified = true;
         await _userRepository.UpdateAsync(user);  // Update the user as verified
 
+        if (!Guid.TryParse(token, out Guid verificationGuid))
+        {
+            throw new ArgumentException("Invalid verification ID format");
+        }
         // Mark the account verification token as used after the user is successfully verified
-        await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(token);
+        await _accountVerificationTokenService.MarkAccountVerificationTokenAsUsedAsync(verificationGuid);
 
         _logger.LogInformation("Account verified successfully.");
         return ServiceResult.Success;  // Return success once everything is verified
@@ -114,7 +118,6 @@ public class AccountVerificationService : IAccountVerificationService
             _logger.LogWarning("No email provided for resending verification email.");
             return ServiceResult.Failure;
         }
-
         try
         {
             // Fetch the user by email
@@ -131,14 +134,14 @@ public class AccountVerificationService : IAccountVerificationService
 
             // Generate a new account verification token for the user
             var newToken = await _accountVerificationTokenService.GenerateAccountVerificationTokenAsync(user.UserId);
-            if (string.IsNullOrEmpty(newToken))
+            if (newToken == null)
             {
                 _logger.LogError("Failed to create a new verification token for user with email: {Email}", email);
                 return ServiceResult.Failure;  // Use Failure property directly
             }
 
             // Send the new verification token to the email verification provider
-            var emailSent = await SendVerificationEmailAsync(newToken);
+            var emailSent = await SendVerificationEmailAsync(newToken.TokenId);
             if (emailSent != ServiceResult.Success)
             {
                 return ServiceResult.Failure;  // Use Failure property directly
@@ -152,45 +155,6 @@ public class AccountVerificationService : IAccountVerificationService
         {
             _logger.LogError(ex, "An error occurred while resending the verification email for email: {Email}", email);
             return ServiceResult.Failure;  // Use Failure property directly
-        }
-    }
-
-    private async Task<bool> EmailValidation(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var jwtToken = tokenHandler.ReadJwtToken(token);
-
-            // Extract the email claim from the token
-            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-
-            if (string.IsNullOrEmpty(emailClaim))
-            {
-                _logger.LogWarning("No email claim found in the token.");
-                return false;
-            }
-            // Check if a user exists with the extracted email
-            var user = await _userRepository.GetByEmailAsync(emailClaim);
-            if (user == null)
-            {
-                _logger.LogWarning("No user found with the email from the token.");
-                return false;
-            }
-
-            // Check if the user is already verified (optional)
-            if (user.IsVerified)
-            {
-                _logger.LogInformation("The user is already verified.");
-                return false; // If already verified, return false or handle as needed
-            }
-
-            return true; // Email claim exists, matches a user, and user is not verified yet
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while validating email from token.");
-            return false;
         }
     }
 }

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AuthenticationProvider.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    [Migration("20250312002555_init")]
+    [Migration("20250315003643_init")]
     partial class init
     {
         /// <inheritdoc />
@@ -48,6 +48,10 @@ namespace AuthenticationProvider.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("IdentificationNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsVerified")
                         .HasColumnType("bit");
 
@@ -64,10 +68,6 @@ namespace AuthenticationProvider.Migrations
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("IdentificationNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
@@ -126,12 +126,13 @@ namespace AuthenticationProvider.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AccountVerificationTokens", (string)null);
+                    b.ToTable("AccountVerificationTokens");
                 });
 
             modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AddressEntity", b =>
                 {
                     b.Property<Guid>("AddressId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("City")
@@ -160,6 +161,8 @@ namespace AuthenticationProvider.Migrations
 
                     b.HasKey("AddressId");
 
+                    b.HasIndex("UserId");
+
                     b.ToTable("Addresses");
                 });
 
@@ -167,9 +170,6 @@ namespace AuthenticationProvider.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("ExpiryDate")
@@ -183,6 +183,9 @@ namespace AuthenticationProvider.Migrations
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
@@ -247,6 +250,12 @@ namespace AuthenticationProvider.Migrations
                         .HasColumnType("bit");
 
                     b.HasKey("UserId");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("IdentificationNumber")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -399,7 +408,7 @@ namespace AuthenticationProvider.Migrations
                 {
                     b.HasOne("AuthenticationProvider.Models.Data.Entities.UserEntity", "User")
                         .WithMany("Addresses")
-                        .HasForeignKey("AddressId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

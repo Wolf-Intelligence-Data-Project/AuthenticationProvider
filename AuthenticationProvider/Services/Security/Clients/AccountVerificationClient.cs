@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
+using AuthenticationProvider.Models.Data.Requests;
 
 namespace AuthenticationProvider.Services.Security.Clients;
 
@@ -32,9 +33,9 @@ public class AccountVerificationClient : IAccountVerificationClient
     /// </returns>
     /// <exception cref="HttpRequestException">Thrown if a network-related issue occurs.</exception>
     /// <exception cref="Exception">Thrown for unexpected failures during the request.</exception>
-    public async Task<bool> SendVerificationEmailAsync(string token)
+    public async Task<bool> SendVerificationEmailAsync( SendVerificationRequest sendVerificationRequest)
     {
-        if (string.IsNullOrWhiteSpace(token))
+        if (sendVerificationRequest == null)
         {
             _logger.LogWarning("Provided token is null or empty.");
             return false;
@@ -42,12 +43,7 @@ public class AccountVerificationClient : IAccountVerificationClient
 
         try
         {
-            _logger.LogInformation("Preparing to send verification email.");
-
-            var requestPayload = new { Token = token };
-            var content = new StringContent(JsonConvert.SerializeObject(requestPayload), Encoding.UTF8, "application/json");
-
-            _logger.LogInformation("Sending request to AccountVerificationProvider endpoint.");
+            var content = new StringContent(JsonConvert.SerializeObject(sendVerificationRequest), Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync(_accountVerificationEndpoint, content);
 
@@ -56,33 +52,26 @@ public class AccountVerificationClient : IAccountVerificationClient
                 _logger.LogInformation("Account verification email sent successfully.");
                 return true;
             }
-            else
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500)
-                {
-                    _logger.LogWarning("Client-side error when sending verification email. Status: {StatusCode}, Response: {ResponseContent}",
-                                        response.StatusCode, responseContent);
-                }
-                else if ((int)response.StatusCode >= 500)
-                {
-                    _logger.LogError("Server-side error when sending verification email. Status: {StatusCode}, Response: {ResponseContent}",
-                                      response.StatusCode, responseContent);
-                }
-
-                return false;
-            }
+            // Log the error response if the request failed.
+            var errorResponse = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to send reset password email. Status Code: {StatusCode}, Response: {ErrorResponse}",
+                response.StatusCode, errorResponse);
+            return false;
         }
         catch (HttpRequestException httpEx)
         {
-            _logger.LogError(httpEx, "Network error when sending verification email.");
-            throw; // Consider rethrowing if the caller should handle it
+            _logger.LogError(httpEx, "HTTP request error while sending reset password email.");
+            return false;
+        }
+        catch (TaskCanceledException timeoutEx)
+        {
+            _logger.LogError(timeoutEx, "Request timed out while sending reset password email.");
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error occurred while sending verification email.");
-            throw;
+            _logger.LogError(ex, "Unexpected error occurred while sending reset password email.");
+            return false;
         }
     }
 }

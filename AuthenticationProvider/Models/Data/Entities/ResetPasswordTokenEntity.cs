@@ -7,6 +7,7 @@ public class ResetPasswordTokenEntity
 {
     
         [Key]
+        [Required]
         public Guid Id { get; set; }  // Primary Key for the token entity
 
         [Required]
@@ -14,9 +15,6 @@ public class ResetPasswordTokenEntity
 
         [Required]
         public string Token { get; set; } = null!;
-
-        [Required]
-        public string TokenType { get; set; } = "ResetPassword"; // You don't need to hide this
 
         [Required]
         public DateTime ExpiryDate { get; set; }

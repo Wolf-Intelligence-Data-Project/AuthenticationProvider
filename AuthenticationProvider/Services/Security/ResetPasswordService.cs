@@ -29,27 +29,25 @@ public class ResetPasswordService : IResetPasswordService
         _passwordHasher = new PasswordHasher<object>();
     }
 
-
     public async Task CreateResetPasswordTokenAsync(string email)
     {
         try
         {
-            var resetPasswordToken = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
-            dynamic tokenInfo = resetPasswordToken;
+            var resetPasswordTokenInfo = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
 
-            string resetId = tokenInfo.TokenId;
-            string token = tokenInfo.TokenString;
+            // Now you can access both TokenId and TokenString from the resetPasswordTokenInfo object
+            string resetId = resetPasswordTokenInfo.TokenId;
+            string token = resetPasswordTokenInfo.TokenString;
 
-            if (resetPasswordToken == null)
+            if (resetPasswordTokenInfo == null)
             {
                 _logger.LogWarning("Token could not be generated.");
             }
 
-
-            var emailSent = await SendResetPasswordEmailAsync(token!, resetId!);
+            var emailSent = await SendResetPasswordEmailAsync(token, resetId);
             if (!emailSent)
             {
-                _logger.LogWarning("Token could not be transfered/sent further.");
+                _logger.LogWarning("Token could not be transferred/sent further.");
             }
         }
         catch (Exception ex)
@@ -59,55 +57,63 @@ public class ResetPasswordService : IResetPasswordService
         }
     }
 
+
     /// <summary>
     /// Sends a reset password email using the provided token.
     /// </summary>
     /// <param name="token">The reset password token.</param>
     /// <returns>True if the email is sent successfully; otherwise, false.</returns>
     private async Task<bool> SendResetPasswordEmailAsync(string token, string resetId)
+{
+    if (string.IsNullOrWhiteSpace(token) || token.Length < 10 || resetId == null || token == null)
     {
-        if (string.IsNullOrWhiteSpace(token) || token.Length < 10 || resetId == null || token == null)
-        {
-            _logger.LogWarning("Invalid token provided for reset password email.");
-            return false;
-        }
-
-        try
-        {
-            if (!await EmailValidation(token))
-            {
-                _logger.LogWarning("The email in the token does not match any user.");
-                return false;
-            }
-
-            // Validate the token
-            var resetPasswordToken = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(token);
-            if (!resetPasswordToken)
-            {
-                _logger.LogWarning("Reset password token is invalid or expired.");
-                return false;
-            }
-
-            // Sending only the reset password token id using the client
-            bool result = await _resetPasswordClient.SendResetPasswordEmailAsync(resetId);
-
-            if (result)
-            {
-                _logger.LogInformation("Reset password email sent successfully.");
-            }
-            else
-            {
-                _logger.LogWarning("Failed to send reset password email.");
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "An error occurred while sending the reset password email.");
-            return false;
-        }
+        _logger.LogWarning("Invalid token provided for reset password email.");
+        return false;
     }
+
+    try
+    {
+        // Validate the email in the token
+        //if (!await EmailValidation(token))
+        //{
+        //    _logger.LogWarning("The email in the token does not match any user.");
+        //    return false;
+        //}
+
+        // Validate the reset password token
+        var resetPasswordToken = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetId);
+        if (!resetPasswordToken)
+        {
+            _logger.LogWarning("Reset password token is invalid or expired.");
+            return false;
+        }
+
+        // Create ResetPasswordEmailRequest using the resetId
+        var resetRequest = new SendResetPasswordRequest
+        {
+            ResetId = resetId // Use the resetId as VerificationId
+        };
+
+        // Send the reset password email using the client
+        bool result = await _resetPasswordClient.SendResetPasswordEmailAsync(resetRequest);
+
+        if (result)
+        {
+            _logger.LogInformation("Reset password email sent successfully.");
+        }
+        else
+        {
+            _logger.LogWarning("Failed to send reset password email.");
+        }
+
+        return result;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "An error occurred while sending the reset password email.");
+        return false;
+    }
+}
 
     /// <summary>
     /// Handles the actual password reset when the user submits the new password.
@@ -116,7 +122,7 @@ public class ResetPasswordService : IResetPasswordService
     /// <returns>True if the password is successfully reset; otherwise, false.</returns>
     public async Task<bool> ResetPasswordAsync(ResetPasswordRequest resetPasswordRequest)
     {
-        if (string.IsNullOrWhiteSpace(resetPasswordRequest.Token) ||
+        if (string.IsNullOrWhiteSpace(resetPasswordRequest.ResetId) ||
             string.IsNullOrWhiteSpace(resetPasswordRequest.NewPassword) ||
             string.IsNullOrWhiteSpace(resetPasswordRequest.ConfirmPassword))
         {
@@ -134,7 +140,7 @@ public class ResetPasswordService : IResetPasswordService
         {
 
             // Validate the reset password token
-            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.Token);
+            var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.ResetId);
             if (resetPasswordToken == null)
             {
                 _logger.LogWarning("Reset password token is invalid or expired.");
@@ -173,44 +179,4 @@ public class ResetPasswordService : IResetPasswordService
             return false;
         }
     }
-    private async Task<bool> EmailValidation(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
-
-            // Extract the email claim from the token
-            var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-
-            if (string.IsNullOrEmpty(emailClaim))
-            {
-                _logger.LogWarning("No email claim found in the token.");
-                return false;
-            }
-
-            // Check if the email exists in the user database
-            var user = await _userRepository.GetByEmailAsync(emailClaim);
-            if (user == null)
-            {
-                _logger.LogWarning("No user found with the email from the token.");
-                return false;
-            }
-
-            // Compare the email from the token with the user's email
-            if (!user.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogWarning("The email in the token does not match the user's email.");
-                return false;
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while validating email from token.");
-            return false;
-        }
-    }
-
 }

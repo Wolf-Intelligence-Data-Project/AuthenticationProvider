@@ -219,8 +219,8 @@ namespace AuthenticationProvider.Migrations
                 {
                     table.PrimaryKey("PK_Addresses", x => x.AddressId);
                     table.ForeignKey(
-                        name: "FK_Addresses_Users_AddressId",
-                        column: x => x.AddressId,
+                        name: "FK_Addresses_Users_UserId",
+                        column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
@@ -250,6 +250,11 @@ namespace AuthenticationProvider.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_AccountVerificationTokens_UserId",
                 table: "AccountVerificationTokens",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Addresses_UserId",
+                table: "Addresses",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
@@ -295,6 +300,18 @@ namespace AuthenticationProvider.Migrations
                 name: "IX_ResetPasswordTokens_UserId",
                 table: "ResetPasswordTokens",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Email",
+                table: "Users",
+                column: "Email",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_IdentificationNumber",
+                table: "Users",
+                column: "IdentificationNumber",
+                unique: true);
         }
 
         /// <inheritdoc />

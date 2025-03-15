@@ -1,4 +1,6 @@
-﻿namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
+﻿using AuthenticationProvider.Models.Data.Requests;
+
+namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
 
 /// <summary>
 /// Defines a contract for an external client responsible for sending 
@@ -13,5 +15,5 @@ public interface IAccountVerificationClient
     /// </summary>
     /// <param name="token">A unique token used to verify the user's account.</param>
     /// <returns>True if the request was successfully processed by the provider; otherwise, false.</returns>
-    Task<bool> SendVerificationEmailAsync(string token);
+    Task<bool> SendVerificationEmailAsync(SendVerificationRequest sendVerificationRequest);
 }

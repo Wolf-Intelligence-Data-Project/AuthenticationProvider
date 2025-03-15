@@ -56,10 +56,10 @@ public class UserDbContext : IdentityDbContext<ApplicationUser>
             entity.ToTable("ResetPasswordTokens"); // Explicit table name
             entity.HasKey(t => t.Id); // Primary key
 
-            entity.HasOne(t => t.User)
-                .WithMany()
-                .HasForeignKey(t => t.UserId)
-                .OnDelete(DeleteBehavior.Cascade); // Delete tokens when a user is deleted
+            //entity.HasOne(t => t.User)
+            //    .WithMany()
+            //    .HasForeignKey(t => t.UserId)
+            //    .OnDelete(DeleteBehavior.Cascade); // Delete tokens when a user is deleted
 
             entity.Property(t => t.Token).IsRequired();
             entity.Property(t => t.ExpiryDate).IsRequired();
@@ -69,13 +69,8 @@ public class UserDbContext : IdentityDbContext<ApplicationUser>
         // Configure the AccountVerificationTokenEntity
         modelBuilder.Entity<AccountVerificationTokenEntity>(entity =>
         {
-            entity.ToTable("AccountVerificationTokens"); // Explicit table name
             entity.HasKey(t => t.Id); // Primary key
 
-            entity.HasOne(t => t.User)
-                .WithMany()
-                .HasForeignKey(t => t.UserId)
-                .OnDelete(DeleteBehavior.Cascade); // Cascade delete tokens when a user is deleted
 
             entity.Property(t => t.Token).IsRequired();
             entity.Property(t => t.ExpiryDate).IsRequired();

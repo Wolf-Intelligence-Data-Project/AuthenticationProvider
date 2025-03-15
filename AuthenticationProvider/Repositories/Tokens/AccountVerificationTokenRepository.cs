@@ -8,12 +8,12 @@ namespace AuthenticationProvider.Repositories.Tokens;
 /// Repository for handling operations related to account verification tokens.
 public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
 {
-    private readonly UserDbContext _context;
+    private readonly UserDbContext _userDbcontext;
     private readonly ILogger<AccountVerificationTokenRepository> _logger;
 
     public AccountVerificationTokenRepository(UserDbContext context, ILogger<AccountVerificationTokenRepository> logger)
     {
-        _context = context;
+        _userDbcontext = context;
         _logger = logger;
     }
 
@@ -26,8 +26,8 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     {
         try
         {
-            await _context.AccountVerificationTokens.AddAsync(token);
-            await _context.SaveChangesAsync();
+            await _userDbcontext.AccountVerificationTokens.AddAsync(token);
+            await _userDbcontext.SaveChangesAsync();
             return token;
         }
         catch (Exception ex)
@@ -45,7 +45,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     {
         try
         {
-            return await _context.AccountVerificationTokens
+            return await _userDbcontext.AccountVerificationTokens
                 .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
         }
         catch (Exception ex)
@@ -59,11 +59,11 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     /// </summary>
     /// <param name="tokenId">The token's unique ID.</param>
     /// <returns>The found token entity, or null if not found.</returns>
-    public async Task<AccountVerificationTokenEntity> GetTokenByIdAsync(Guid tokenId)
+    public async Task<AccountVerificationTokenEntity> GetByIdAsync(Guid tokenId)
     {
         try
         {
-            return await _context.AccountVerificationTokens
+            return await _userDbcontext.AccountVerificationTokens
                                  .FirstOrDefaultAsync(t => t.Id == tokenId);
         }
         catch (Exception ex)
@@ -80,11 +80,11 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     {
         try
         {
-            var token = await _context.AccountVerificationTokens.FindAsync(tokenId);
+            var token = await _userDbcontext.AccountVerificationTokens.FindAsync(tokenId);
             if (token != null)
             {
                 token.IsUsed = true;
-                await _context.SaveChangesAsync();
+                await _userDbcontext.SaveChangesAsync();
             }
             else
             {
@@ -105,7 +105,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     {
         try
         {
-            var user = await _context.Users.FirstOrDefaultAsync(c => c.UserId == userId);
+            var user = await _userDbcontext.Users.FirstOrDefaultAsync(c => c.UserId == userId);
             if (user == null)
             {
                 _logger.LogWarning("User not found.");
@@ -117,7 +117,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
                 return;
             }
 
-            var tokens = await _context.AccountVerificationTokens
+            var tokens = await _userDbcontext.AccountVerificationTokens
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
 
@@ -128,8 +128,8 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
                     token.IsUsed = true;
                 }
 
-                _context.AccountVerificationTokens.RemoveRange(tokens);
-                await _context.SaveChangesAsync();
+                _userDbcontext.AccountVerificationTokens.RemoveRange(tokens);
+                await _userDbcontext.SaveChangesAsync();
             }
             else
             {
@@ -157,7 +157,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
             }
 
             // Retrieve the token from the database
-            var tokenEntity = await _context.AccountVerificationTokens
+            var tokenEntity = await _userDbcontext.AccountVerificationTokens
                                              .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
             if (tokenEntity == null)
             {
@@ -167,8 +167,8 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
 
             // Mark the token as used and delete it
             tokenEntity.IsUsed = true;
-            _context.AccountVerificationTokens.Remove(tokenEntity);
-            await _context.SaveChangesAsync();
+            _userDbcontext.AccountVerificationTokens.Remove(tokenEntity);
+            await _userDbcontext.SaveChangesAsync();
 
             _logger.LogInformation("Token has been revoked and deleted.");
         }

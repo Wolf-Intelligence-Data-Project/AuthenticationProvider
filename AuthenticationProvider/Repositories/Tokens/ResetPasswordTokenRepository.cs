@@ -7,12 +7,12 @@ namespace AuthenticationProvider.Repositories.Tokens;
 
 public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
 {
-    private readonly UserDbContext _context;
+    private readonly UserDbContext _userDbContext;
     private readonly ILogger<ResetPasswordTokenRepository> _logger;
 
-    public ResetPasswordTokenRepository(UserDbContext context, ILogger<ResetPasswordTokenRepository> logger)
+    public ResetPasswordTokenRepository(UserDbContext userDbContext, ILogger<ResetPasswordTokenRepository> logger)
     {
-        _context = context;
+        _userDbContext = userDbContext;
         _logger = logger;
     }
 
@@ -25,9 +25,8 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
-            var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
-            return await _context.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Id == id && t.ExpiryDate > stockholmTime && !t.IsUsed);
+            return await _userDbContext.ResetPasswordTokens
+                .FirstOrDefaultAsync(t => t.Id == id); // Just fetch the token, no validation here
         }
         catch (Exception ex)
         {
@@ -35,6 +34,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
             throw new Exception("Det gick inte att hämta lösenordsåterställningstoken.");
         }
     }
+
 
     /// <summary>
     /// Retrieves a reset password token by the token string.
@@ -47,7 +47,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         {
             var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
 
-            return await _context.ResetPasswordTokens
+            return await _userDbContext.ResetPasswordTokens
                 .FirstOrDefaultAsync(t => t.Token == token && t.ExpiryDate > stockholmTime && !t.IsUsed);
         }
         catch (Exception ex)
@@ -66,8 +66,8 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
-            _context.ResetPasswordTokens.Add(token);
-            await _context.SaveChangesAsync();
+            _userDbContext.ResetPasswordTokens.Add(token);
+            await _userDbContext.SaveChangesAsync();
             return token;
         }
         catch (Exception ex)
@@ -84,14 +84,14 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
-            var tokens = await _context.ResetPasswordTokens
+            var tokens = await _userDbContext.ResetPasswordTokens
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
 
             if (tokens.Any())
             {
-                _context.ResetPasswordTokens.RemoveRange(tokens);
-                await _context.SaveChangesAsync();
+                _userDbContext.ResetPasswordTokens.RemoveRange(tokens);
+                await _userDbContext.SaveChangesAsync();
             }
         }
         catch (Exception ex)
@@ -108,11 +108,11 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
     {
         try
         {
-            var token = await _context.ResetPasswordTokens.FindAsync(tokenId);
+            var token = await _userDbContext.ResetPasswordTokens.FindAsync(tokenId);
             if (token != null)
             {
                 token.IsUsed = true;
-                await _context.SaveChangesAsync();
+                await _userDbContext.SaveChangesAsync();
             }
         }
         catch (Exception ex)

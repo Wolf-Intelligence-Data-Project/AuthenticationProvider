@@ -1,12 +1,13 @@
-﻿using AuthenticationProvider.Models.Data.Entities;
+﻿using AuthenticationProvider.Models;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
 public interface IResetPasswordTokenService
 {
-    Task<object> GenerateResetPasswordTokenAsync(string email);
+    Task<TokenInfo> GenerateResetPasswordTokenAsync(string email);
 
-    Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string token);
+    Task<ResetPasswordTokenEntity> GetValidResetPasswordTokenAsync(string tokenId);
 
     Task<bool> ValidateResetPasswordTokenAsync(string token);
 

@@ -5,7 +5,7 @@ namespace AuthenticationProvider.Models.Data.Requests;
 public class ResetPasswordRequest
 {
     [Required]
-    public string Token { get; set; } = null!;
+    public string ResetId { get; set; } = null!;
 
     [Required(ErrorMessage = "Lösenord krävs.")]
     [DataType(DataType.Password)]

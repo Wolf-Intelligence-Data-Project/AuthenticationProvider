@@ -5,8 +5,6 @@ using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Services.Tokens;
-using Microsoft.AspNetCore.Authorization;
-using AuthenticationProvider.Repositories;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -19,23 +17,31 @@ public class AccountVerificationController : ControllerBase
 {
     private readonly IAccountVerificationService _accountVerificationService;
     private readonly IAccountVerificationTokenService _accountVerificationTokenService;
-    private readonly ILogger<AccountVerificationController> _logger;
     private readonly IUserRepository _userRepository;
+    private readonly IAccessTokenService _accessTokenService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly string _frontendUrl;
+    private readonly ILogger<AccountVerificationController> _logger;
+
 
     // Constructor injection of services
     public AccountVerificationController(
         IAccountVerificationService accountVerificationService,
         IAccountVerificationTokenService accountVerificationTokenService,
         IUserRepository userRepository,
+        IAccessTokenService accessTokenService,
         ILogger<AccountVerificationController> logger,
+        IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration)
     {
         _accountVerificationTokenService = accountVerificationTokenService;
         _accountVerificationService = accountVerificationService;
         _userRepository = userRepository;
-        _logger = logger;
+        _accessTokenService = accessTokenService;
+        _httpContextAccessor = httpContextAccessor;
         _frontendUrl = configuration["VerificationSuccess"]!;
+        _logger = logger;
+        
         if (string.IsNullOrWhiteSpace(_frontendUrl))
         {
             _logger.LogError("Frontend URL for verification success is not configured.");
@@ -54,17 +60,14 @@ public class AccountVerificationController : ControllerBase
     /// </returns>
     //[Authorize(Policy = "AccountVerificationToken")]
     [HttpPost("send-verification-email")]
-    public async Task<IActionResult> SendVerificationEmail([FromBody] string token)
+    public async Task<IActionResult> SendVerificationEmail()
     {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            _logger.LogWarning("Token is missing for the send verification email request.");
-            return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
-        }
-
         try
         {
-            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(token);
+            string token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"] ?? string.Empty;
+
+            var userId = _accessTokenService.GetUserIdFromToken(token);
+            var emailSent = await _accountVerificationService.SendVerificationEmailAsync(userId);
             if (emailSent != ServiceResult.Success)
             {
                 _logger.LogError("Failed to send verification email.");
@@ -103,17 +106,11 @@ public class AccountVerificationController : ControllerBase
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
-        // Extra check of the token before starting a process (where it checks again)
-        var isTokenValid = await _accountVerificationTokenService.ValidateAccountVerificationTokenAsync(token);
-        if (isTokenValid is UnauthorizedObjectResult || isTokenValid is BadRequestObjectResult)
-        {
-            return isTokenValid; 
-        }
-
         try
         {
+
             // Call VerifyEmailAsync
-            var verificationResult = await _accountVerificationService.VerifyEmailAsync(token);
+            var verificationResult = await _accountVerificationService.VerifyAccountAsync(token);
 
             // Handle different verification result outcomes
             if (verificationResult == ServiceResult.Success)

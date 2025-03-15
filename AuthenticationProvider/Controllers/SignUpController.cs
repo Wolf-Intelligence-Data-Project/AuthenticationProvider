@@ -57,7 +57,7 @@ public class SignUpController : ControllerBase
             _logger.LogInformation("User registered successfully");
 
             // Return success message with user ID and verification token
-            return Ok(new { message = "Användaren registrerat framgångsrikt!", data = new { userId = signUpResponse.UserId, token = signUpResponse.Token } });
+            return Ok(new { message = "Användaren registrerat framgångsrikt!", data = new { userId = signUpResponse.UserId, token = signUpResponse.TokenId } });
         }
         catch (InvalidOperationException ex)
         {

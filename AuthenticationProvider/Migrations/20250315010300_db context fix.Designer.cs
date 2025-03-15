@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AuthenticationProvider.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    [Migration("20250312214131_additional table fixes")]
-    partial class additionaltablefixes
+    [Migration("20250315010300_db context fix")]
+    partial class dbcontextfix
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -84,6 +84,9 @@ namespace AuthenticationProvider.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -126,7 +129,7 @@ namespace AuthenticationProvider.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AccountVerificationTokens", (string)null);
+                    b.ToTable("AccountVerificationTokens");
                 });
 
             modelBuilder.Entity("AuthenticationProvider.Models.Data.Entities.AddressEntity", b =>
