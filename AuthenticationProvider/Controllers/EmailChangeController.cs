@@ -1,9 +1,9 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using Microsoft.AspNetCore.Authorization;
+using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -18,9 +18,9 @@ namespace AuthenticationProvider.Controllers;
 public class EmailChangeController : ControllerBase
 {
     private readonly IAccessTokenService _accessTokenService;
-    private readonly IAccountSecurityService _emailChangeService;
+    private readonly IEmailSecurityService _emailChangeService;
 
-    public EmailChangeController(IAccessTokenService accessTokenService, IAccountSecurityService emailChangeService)
+    public EmailChangeController(IAccessTokenService accessTokenService, IEmailSecurityService emailChangeService)
     {
         _accessTokenService = accessTokenService ?? throw new ArgumentNullException(nameof(accessTokenService));
         _emailChangeService = emailChangeService ?? throw new ArgumentNullException(nameof(emailChangeService));
@@ -34,13 +34,12 @@ public class EmailChangeController : ControllerBase
     [HttpPatch("change-email")]
     public async Task<IActionResult> ChangeEmail([FromBody] EmailChangeRequest request)
     {
-        // Validate the request for null values or missing information
+
         if (request == null)
         {
             return BadRequest(ErrorResponses.InvalidInput);
         }
 
-        // Check if the request model is valid
         if (!ModelState.IsValid)
         {
             return BadRequest(ErrorResponses.ModelStateError);
@@ -48,10 +47,8 @@ public class EmailChangeController : ControllerBase
 
         try
         {
-            // Call the service to validate the access token and perform the email change
             bool result = await _emailChangeService.ChangeEmailAsync(request);
 
-            // If the email change fails, return a bad request with specific error details
             if (!result)
             {
                 return BadRequest(new
@@ -62,17 +59,14 @@ public class EmailChangeController : ControllerBase
                 });
             }
 
-            // Return a success message if the email update is successful
             return Ok(new { message = "E-postadress har uppdaterats." });
         }
         catch (UnauthorizedAccessException ex)
         {
-            // Handle unauthorized access attempts (e.g., invalid or expired token)
             return Unauthorized(ErrorResponses.TokenExpiredOrInvalid);
         }
         catch (Exception ex)
         {
-            // Handle any unexpected errors and log for internal debugging
             return StatusCode(500, ErrorResponses.InternalServerError);
         }
     }

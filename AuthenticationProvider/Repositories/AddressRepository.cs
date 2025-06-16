@@ -29,7 +29,6 @@ public class AddressRepository : IAddressRepository
     {
         try
         {
-            // Ensure address uniqueness: Same street address, postal code, and city should not exist for the same user
             bool isAddressUnique = !await _userDbContext.Addresses
                 .AnyAsync(a => a.StreetAndNumber == address.StreetAndNumber
                                && a.PostalCode == address.PostalCode
@@ -41,7 +40,6 @@ public class AddressRepository : IAddressRepository
                 throw new InvalidOperationException("Adressen existerar redan i systemet.");
             }
 
-            // If adding a primary address, check if the user already has a primary address
             if (address.IsPrimary)
             {
                 bool hasPrimaryAddress = await _userDbContext.Addresses
@@ -53,7 +51,6 @@ public class AddressRepository : IAddressRepository
                 }
             }
 
-            // Add the address to the database
             await _userDbContext.AddAsync(address);
             await _userDbContext.SaveChangesAsync();
         }
@@ -112,7 +109,6 @@ public class AddressRepository : IAddressRepository
     {
         try
         {
-            // If updating to Primary address, ensure no other primary address exists
             if (address.IsPrimary)
             {
                 bool hasPrimaryAddress = await _userDbContext.Addresses

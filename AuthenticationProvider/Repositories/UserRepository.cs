@@ -48,7 +48,6 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            // Check if the user already exists
             bool userExists = await _userDbContext.Set<UserEntity>()
                 .AnyAsync(c => c.IdentificationNumber == user.IdentificationNumber || c.Email == user.Email);
 
@@ -57,7 +56,6 @@ public class UserRepository : IUserRepository
                 throw new InvalidOperationException("Användaren med samma organisationsnummer eller e-postadress existerar redan.");
             }
 
-            // Add the user to the database
             await _userDbContext.Set<UserEntity>().AddAsync(user);
             await _userDbContext.SaveChangesAsync();
         }
@@ -76,7 +74,6 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            // Find the existing user by its ID
             var existingUser = await _userDbContext.Set<UserEntity>().FindAsync(user.UserId);
 
             if (existingUser == null)
@@ -98,15 +95,16 @@ public class UserRepository : IUserRepository
     /// </summary>
     /// <param name="email">The email address of the user.</param>
     /// <returns>The user entity if found, otherwise null.</returns>
-    public async Task<UserEntity> GetByEmailAsync(string email)
+    public async Task<UserEntity?> GetByEmailAsync(string email)
     {
         try
         {
-            return await _userDbContext.Set<UserEntity>().FirstOrDefaultAsync(c => c.Email == email);
+            _logger.LogWarning(email);
+            return await _userDbContext.Users
+                .FirstOrDefaultAsync(c => c.Email.ToLower() == email.ToLower());
         }
         catch (Exception ex)
         {
-            // Log error details
             _logger.LogError(ex, "Error retrieving user by email.");
             throw;
         }
@@ -145,7 +143,6 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            // Retrieve the user with related addresses
             var user = await _userDbContext.Users
                 .Include(c => c.Addresses)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
@@ -155,7 +152,6 @@ public class UserRepository : IUserRepository
                 throw new InvalidOperationException("Användaren finns inte.");
             }
 
-            // Remove related addresses and the user itself
             _userDbContext.Addresses.RemoveRange(user.Addresses);
             _userDbContext.Users.Remove(user);
             await _userDbContext.SaveChangesAsync();

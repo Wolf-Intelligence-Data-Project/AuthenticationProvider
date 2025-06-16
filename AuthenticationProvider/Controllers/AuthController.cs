@@ -1,7 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces.Security;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -82,7 +82,13 @@ public class AuthController : ControllerBase
                 _cache.Remove(cacheKey);
                 _logger.LogInformation("Login successful for: {UserEmail}", request.Email);
 
-                return Ok(new { message = "Inloggning lyckades." });
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Inloggning lyckades."
+                });
+
             }
 
             failedAttempts++;
@@ -114,11 +120,6 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Logout()
     {
         var token = Request.Cookies["accessToken"];
-
-        if (string.IsNullOrEmpty(token))
-        {
-            return BadRequest(new { message = "Åtkomsttoken saknas." });
-        }
 
         var signOutSuccess = await _signOutService.SignOutAsync(token);
 
@@ -156,8 +157,8 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Åtkomsttoken saknas." });
         }
 
-        var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token);
+        var (isAuthenticated, isEmailVerified) = _accessTokenService.ValidateAccessToken(token);
 
-        return Ok(new { isAuthenticated, isAccountVerified });
+        return Ok(new { isAuthenticated, isEmailVerified });
     }
 }

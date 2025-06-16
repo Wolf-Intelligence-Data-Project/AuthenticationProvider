@@ -1,8 +1,8 @@
 ﻿using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationProvider.Interfaces.Services.Tokens;
+using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Controllers;
 
@@ -63,7 +63,6 @@ public class ResetPasswordController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Log the exception or handle it as needed
             return StatusCode(500, new
             {
                 ErrorCode = "EMAIL_SEND_FAILED",
@@ -94,9 +93,9 @@ public class ResetPasswordController : ControllerBase
                 _logger.LogWarning("Invalid or expired token accessed.");
                 return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
             }
-
+            string token = reset;
             _logger.LogInformation("Valid token accessed");
-            return Redirect($"{_frontendUrl}/reset-password?token={reset}");
+            return Redirect($"{_frontendUrl}/reset-password?token={token}");
         }
         catch (ArgumentNullException ex)
         {
@@ -122,17 +121,15 @@ public class ResetPasswordController : ControllerBase
             return BadRequest(ErrorResponses.MissingParameter);
         }
 
-        // Extra check of the token before starting a process (where it checks again)
         var isTokenValid = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetPasswordRequest.ResetId);
         if (!isTokenValid)
         {
-            _logger.LogWarning("Account verification token is invalid, used, or expired.");
+            _logger.LogWarning("Email verification token is invalid, used, or expired.");
             return BadRequest(ErrorResponses.TokenExpiredOrInvalid);
         }
 
         try
         {
-            // Call service method to handle password reset logic
             var success = await _resetPasswordService.ResetPasswordAsync(resetPasswordRequest);
 
             if (!success)

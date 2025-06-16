@@ -5,9 +5,9 @@ using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Interfaces.Utilities.Security;
 using AuthenticationProvider.Models.Data.Entities;
-using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services;
+using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Services;
 
@@ -17,8 +17,8 @@ namespace AuthenticationProvider.Services;
 public class SignUpService : ISignUpService
 {
     private readonly IUserRepository _userRepository;
-    private readonly IAccountVerificationTokenService _accountVerificationTokenService;
-    private readonly IAccountVerificationService _accountVerificationService;
+    private readonly IEmailVerificationTokenService _emailVerificationTokenService;
+    private readonly IEmailVerificationService _emailVerificationService;
     private readonly IAddressRepository _addressRepository;
     private readonly ILogger<SignUpService> _logger;
     private readonly PasswordHasher<UserEntity> _passwordHasher;
@@ -29,8 +29,8 @@ public class SignUpService : ISignUpService
 
     public SignUpService(
         IUserRepository userRepository,
-        IAccountVerificationTokenService accountVerificationTokenService,
-        IAccountVerificationService accountVerificationService,
+        IEmailVerificationTokenService emailVerificationTokenService,
+        IEmailVerificationService emailVerificationService,
         IAddressRepository addressRepository,
         ILogger<SignUpService> logger,
         IEmailRestrictionService emailRestrictionService,
@@ -40,8 +40,8 @@ public class SignUpService : ISignUpService
         PasswordHasher<UserEntity> passwordHasher)
     {
         _userRepository = userRepository;
-        _accountVerificationTokenService = accountVerificationTokenService;
-        _accountVerificationService = accountVerificationService;
+        _emailVerificationTokenService = emailVerificationTokenService;
+        _emailVerificationService = emailVerificationService;
         _addressRepository = addressRepository;
         _logger = logger;
         _passwordHasher = new PasswordHasher<UserEntity>();
@@ -55,7 +55,6 @@ public class SignUpService : ISignUpService
     {
         ValidateSignUpRequest(request);
 
-        // Check if the email is restricted before proceeding
         if (_emailRestrictionService.IsRestrictedEmail(request.Email))
         {
             throw new InvalidOperationException("Den angivna e-posten är inte tillåten.");
@@ -66,32 +65,32 @@ public class SignUpService : ISignUpService
             throw new InvalidOperationException("Ett företag med angivet organisationsnummer eller e-post finns redan.");
         }
 
-        // Hash the password
+        if (request.IsCompany != true)
+        {
+            request.AdditionalAddresses = null;
+        }
+
         string hashedPassword = _passwordHasher.HashPassword(null, request.Password);
 
         var user = new UserEntity
         {
             IdentificationNumber = request.IdentificationNumber,
             IsCompany = request.IsCompany,
-            CompanyName = request.IsCompany == true ? request.CompanyName : null!,
+            CompanyName = request.IsCompany ? request.CompanyName : "",
             Email = request.Email,
-            BusinessType = request.IsCompany == true ? request.BusinessType : null!,
+            BusinessType = request.IsCompany ? request.BusinessType : "",
             FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
             TermsAndConditions = request.TermsAndConditions,
             IsVerified = false,
-            PasswordHash = hashedPassword      
+            PasswordHash = hashedPassword
         };
 
         await _userRepository.AddAsync(user);
 
-        // Add the primary and additional addresses
         await AddAddressesAsync(request, user);
 
-
-
-        // Send the verification email
-        var emailSent = await _accountVerificationService.SendVerificationEmailAsync(user.UserId.ToString());
+        var emailSent = await _emailVerificationService.PrepareAndSendVerificationAsync(user.UserId.ToString());
         if (emailSent != ServiceResult.Success)
         {
             throw new InvalidOperationException("Det gick inte att skicka verifieringsmail.");
@@ -103,6 +102,7 @@ public class SignUpService : ISignUpService
             UserId = user.UserId
         };
     }
+
     public async Task DeleteUserAsync(DeleteRequest deleteRequest)
     {
         var token = _httpContextAccessor.HttpContext?.Request?.Cookies["AccessToken"];
@@ -119,7 +119,6 @@ public class SignUpService : ISignUpService
         {
             throw new InvalidOperationException("Användaren hittades inte.");
         }
-        // Verify the plain-text password using the injected PasswordHasher
 
         var passwordMatch = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (passwordMatch != PasswordVerificationResult.Success)
@@ -140,10 +139,8 @@ public class SignUpService : ISignUpService
 
     private async Task AddAddressesAsync(SignUpRequest request, UserEntity user)
     {
-        // Retrieve all existing addresses associated with the user once
         var existingAddresses = await _addressRepository.GetAddressesByUserIdAsync(user.UserId);
 
-        // Add primary address
         if (request.PrimaryAddress != null)
         {
             if (string.IsNullOrWhiteSpace(request.PrimaryAddress.StreetAndNumber) ||
@@ -153,7 +150,6 @@ public class SignUpService : ISignUpService
                 throw new InvalidOperationException("Primary address is incomplete.");
             }
 
-            // Check if the primary address already exists for the user
             if (existingAddresses.Any(a => a.StreetAndNumber == request.PrimaryAddress.StreetAndNumber &&
                                            a.City == request.PrimaryAddress.City &&
                                            a.PostalCode == request.PrimaryAddress.PostalCode))
@@ -174,8 +170,7 @@ public class SignUpService : ISignUpService
             await _addressRepository.AddAsync(primaryAddress);
         }
 
-        // Add additional addresses
-        if (request.AdditionalAddresses != null && request.IsCompany != null)
+        if (request.AdditionalAddresses != null && request.IsCompany == true)
         {
             foreach (var additionalAddress in request.AdditionalAddresses)
             {
@@ -186,7 +181,6 @@ public class SignUpService : ISignUpService
                     throw new InvalidOperationException("Additional address is incomplete.");
                 }
 
-                // Check if the additional address already exists for the user
                 if (existingAddresses.Any(a => a.StreetAndNumber == additionalAddress.StreetAndNumber &&
                                                a.City == additionalAddress.City &&
                                                a.PostalCode == additionalAddress.PostalCode))
@@ -215,10 +209,8 @@ public class SignUpService : ISignUpService
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);
 
-        // Perform validation using data annotations
         bool isValid = Validator.TryValidateObject(request, validationContext, validationResults, true);
 
-        // If the validation failed, throw an exception with the first error message
         if (!isValid)
         {
             var errorMessage = validationResults.FirstOrDefault()?.ErrorMessage;

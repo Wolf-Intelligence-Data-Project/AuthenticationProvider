@@ -27,9 +27,9 @@ public static class SuccessDetails
     public static readonly string PasswordChangedDetails = "Du kan nu logga in med det nya lösenordet.";
 
     /// <summary>
-    /// Details confirming that the account has been verified successfully.
+    /// Details confirming that the email has been verified successfully.
     /// </summary>
-    public static readonly string AccountVerifiedDetails = "Kontot har verifierats och är nu aktiverat.";
+    public static readonly string EmailVerifiedDetails = "Kontot har verifierats och är nu aktiverat.";
 
     /// <summary>
     /// Details indicating that a request has been processed and completed without issues.

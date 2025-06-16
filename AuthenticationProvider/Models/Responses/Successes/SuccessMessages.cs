@@ -27,9 +27,9 @@ public static class SuccessMessages
     public static readonly string PasswordChanged = "Lösenordet har ändrats.";
 
     /// <summary>
-    /// Message confirming that an account has been verified.
+    /// Message confirming that an email has been verified.
     /// </summary>
-    public static readonly string AccountVerified = "Kontot har verifierats.";
+    public static readonly string EmailVerified = "Kontot har verifierats.";
 
     /// <summary>
     /// Message indicating that a user's request has been processed successfully.

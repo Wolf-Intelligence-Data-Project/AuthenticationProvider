@@ -1,9 +1,9 @@
 ﻿using AuthenticationProvider.Interfaces.Services.Security.Clients;
-using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Dtos;
 using Newtonsoft.Json;
 using System.Text;
 
-namespace AuthenticationProvider.Services.Security.Clients;
+namespace AuthenticationProvider.Services.Clients;
 
 /// <summary>
 /// Client responsible for dispatching a reset password token to an external provider, 
@@ -30,7 +30,7 @@ public class ResetPasswordClient : IResetPasswordClient
     /// <param name="httpClient">The HTTP client used to communicate with the external reset password provider.</param>
     /// <param name="configuration">Configuration containing the endpoint URL for the reset password provider.</param>
     /// <param name="logger">Logger for recording request attempts, warnings, and errors.</param>
-    public async Task<bool> SendResetPasswordEmailAsync(SendResetPasswordRequest sendResetPasswordRequest)
+    public async Task<bool> SendResetPasswordEmailAsync(ResetPasswordDto sendResetPasswordRequest)
     {
         if (sendResetPasswordRequest == null)
         {
@@ -40,20 +40,16 @@ public class ResetPasswordClient : IResetPasswordClient
 
         try
         {
-            // Create the request payload by serializing the sendResetPasswordRequest model.
             var content = new StringContent(JsonConvert.SerializeObject(sendResetPasswordRequest), Encoding.UTF8, "application/json");
 
-            // Send the request to the reset password endpoint.
             var response = await _httpClient.PostAsync(_resetPasswordEndpoint, content);
 
-            // Handle the response.
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation("Reset password email sent successfully.");
                 return true;
             }
 
-            // Log the error response if the request failed.
             var errorResponse = await response.Content.ReadAsStringAsync();
             _logger.LogWarning("Failed to send reset password email. Status Code: {StatusCode}, Response: {ErrorResponse}",
                 response.StatusCode, errorResponse);

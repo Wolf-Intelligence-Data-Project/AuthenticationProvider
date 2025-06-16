@@ -1,6 +1,6 @@
 ﻿using AuthenticationProvider.Interfaces.Services;
 using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Requests;
 using AuthenticationProvider.Models.Responses.Errors;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,12 +51,10 @@ public class SignUpController : ControllerBase
 
         try
         {
-            // Delegate registration logic to the SignUpService
             var signUpResponse = await _signUpService.RegisterUserAsync(request);
 
             _logger.LogInformation("User registered successfully");
 
-            // Return success message with user ID and verification token
             return Ok(new { message = "Användaren registrerat framgångsrikt!", data = new { userId = signUpResponse.UserId, token = signUpResponse.TokenId } });
         }
         catch (InvalidOperationException ex)
@@ -90,12 +88,10 @@ public class SignUpController : ControllerBase
 
         try
         {
-            // Delete logic to the SignUpService
             await _signUpService.DeleteUserAsync(deleteRequest);
 
             _logger.LogInformation("User with ID deleted successfully.");
 
-            // Return success message
             return Ok(new { message = "Användaren har tagits bort framgångsrikt.", details = (string?)null });
         }
         catch (KeyNotFoundException ex)

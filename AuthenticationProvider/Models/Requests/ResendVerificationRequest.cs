@@ -1,10 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Requests;
+namespace AuthenticationProvider.Models.Requests;
 
-public class EmailRequest
+public class ResendVerificationRequest
 {
     [Required(ErrorMessage = "E-postadress krävs.")]
     [EmailAddress(ErrorMessage = "Ogiltig e-postadress.")]
-    public string Email { get; set; } = null!;
+    public string Email { get; set; }
 }

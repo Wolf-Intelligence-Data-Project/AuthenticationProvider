@@ -1,6 +1,7 @@
 ﻿using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Utilities;
 using AuthenticationProvider.Models.Data;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Services;
 
@@ -25,38 +26,27 @@ public class SignOutService : ISignOutService
     /// </returns>
     public async Task<bool> SignOutAsync(string token)
     {
-        if (string.IsNullOrEmpty(token))
-        {
-            _logger.LogWarning("Sign-out failed: Token is null or empty.");
-            return false;
-        }
 
         try
         {
-            // Check if the token is valid and retrieve the authentication and verification statuses
-            var (isAuthenticated, isAccountVerified) = _accessTokenService.ValidateAccessToken(token); // Retrieve authentication and verification status
+            var (isAuthenticated, isEmailVerified) = _accessTokenService.ValidateAccessToken(token);
 
-            // Log if token is invalid or expired, but allow sign-out regardless
             if (!isAuthenticated)
             {
                 _logger.LogInformation("Token is invalid or expired, proceeding with sign-out.");
             }
 
-            // Optionally, log if the token is not verified but proceed with sign-out
-            if (!isAccountVerified)
+            if (!isEmailVerified)
             {
                 _logger.LogInformation("Token is not verified, proceeding with sign-out.");
             }
 
-            // You can still revoke the token even if it's invalid or expired
-            var userId = _accessTokenService.GetUserIdFromToken(token); // Get userId from token if possible
+            var userId = _accessTokenService.GetUserIdFromToken(token);
 
-            // Revoke the token
-            var user = new ApplicationUser { Id = userId }; // Assuming user has the Id property for matching
-            await _accessTokenService.RevokeAndBlacklistAccessToken(user); // Revoke token from service
+            await _accessTokenService.RevokeAndBlacklistAccessToken(userId);
 
             _logger.LogInformation("Token successfully removed during sign-out.");
-            return true;  // Return true as token revocation was successful
+            return true; 
         }
         catch (Exception ex)
         {

@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Models.Data.Requests;
+﻿using AuthenticationProvider.Models.Requests;
 using AuthenticationProvider.Models.Responses;
 
 namespace AuthenticationProvider.Interfaces.Services;

@@ -2,11 +2,9 @@
 using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities;
-using AuthenticationProvider.Models.Data;
 using AuthenticationProvider.Models.Data.Entities;
-using AuthenticationProvider.Models.Data.Requests;
 using AuthenticationProvider.Interfaces.Services.Tokens;
-using System;
+using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Services;
 
@@ -17,13 +15,13 @@ public class SignInService : ISignInService
 {
     private readonly IUserRepository _userRepository;
     private readonly IAccessTokenService _accessTokenService;
-    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IPasswordHasher<UserEntity> _passwordHasher;
     private readonly ILogger<SignInService> _logger;
 
     public SignInService(
         IUserRepository userRepository,
         IAccessTokenService accessTokenService,
-        IPasswordHasher<ApplicationUser> passwordHasher,
+        IPasswordHasher<UserEntity> passwordHasher,
         ILogger<SignInService> logger)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
@@ -62,7 +60,6 @@ public class SignInService : ISignInService
 
         try
         {
-            // Retrieve the user by email
             var userEntity = await _userRepository.GetByEmailAsync(signInRequest.Email);
             if (userEntity == null)
             {
@@ -73,12 +70,8 @@ public class SignInService : ISignInService
                     ErrorMessage = "Användaren finns inte."
                 };
             }
-
-            // Convert UserEntity to ApplicationUser for authentication
-            var applicationUser = MapToApplicationUser(userEntity);
-
-            // Validate password
-            if (!ValidatePassword(applicationUser, signInRequest.Password))
+         
+            if (!ValidatePassword(userEntity, signInRequest.Password))
             {
                 _logger.LogWarning("Sign-in failed: Invalid credentials for the provided email.");
                 return new SignInResponse
@@ -88,20 +81,26 @@ public class SignInService : ISignInService
                 };
             }
 
-            // Generate access token and store in HTTP-only cookie
-            var token = _accessTokenService.GenerateAccessToken(applicationUser);
+            var token = _accessTokenService.GenerateAccessToken(userEntity);
+            if (token == null)
+            {
+                return new SignInResponse
+                {
+                    Success = false,
+                    Message = "Inloggning lyckades.",
+                    User = userEntity, 
+
+                };
+            }
 
             _logger.LogInformation("User signed in successfully.");
-            _logger.LogInformation(applicationUser.Id);
             return new SignInResponse
             {
                 Success = true,
                 Message = "Inloggning lyckades.",
-                User = applicationUser, // You may exclude the user if you only rely on the cookie
+                User = userEntity,
 
             };
-            
-
         }
         catch (Exception ex)
         {
@@ -115,29 +114,12 @@ public class SignInService : ISignInService
     }
 
     /// <summary>
-    /// Maps a <see cref="UserEntity"/> to an <see cref="ApplicationUser"/> model.
-    /// </summary>
-    private ApplicationUser MapToApplicationUser(UserEntity userEntity)
-    {
-        return new ApplicationUser
-        {
-            Id = userEntity.UserId.ToString(),
-            UserName = userEntity.Email,
-            Email = userEntity.Email,
-            PasswordHash = userEntity.PasswordHash,
-            CompanyName = userEntity.CompanyName,
-            IdentificationNumber = userEntity.IdentificationNumber,
-            IsVerified = userEntity.IsVerified
-        };
-    }
-
-    /// <summary>
     /// Validates the provided password against the stored hash.
     /// </summary>
     /// <param name="user">The user whose password needs to be verified.</param>
     /// <param name="providedPassword">The password provided by the user.</param>
     /// <returns>True if the password is valid; otherwise, false.</returns>
-    private bool ValidatePassword(ApplicationUser user, string providedPassword)
+    private bool ValidatePassword(UserEntity user, string providedPassword)
     {
         var passwordResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, providedPassword);
         return passwordResult == PasswordVerificationResult.Success;

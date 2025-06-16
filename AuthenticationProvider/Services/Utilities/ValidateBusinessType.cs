@@ -37,11 +37,11 @@ public class ValidateBusinessTypeAttribute : ValidationAttribute
         {
             var fieldInfo = businessType.GetType().GetField(businessType.ToString());
             var attribute = fieldInfo?.GetCustomAttribute<DisplayAttribute>();
-            return attribute?.Name ?? businessType.ToString(); // Fallback to enum name if no display name
+            return attribute?.Name ?? businessType.ToString();
         }
         catch
         {
-            return businessType.ToString(); // Return enum name as fallback
+            return businessType.ToString();
         }
     }
 }

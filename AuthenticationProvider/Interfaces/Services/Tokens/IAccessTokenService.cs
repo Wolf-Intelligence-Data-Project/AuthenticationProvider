@@ -1,4 +1,5 @@
 ﻿using AuthenticationProvider.Models.Data;
+using AuthenticationProvider.Models.Data.Entities;
 
 namespace AuthenticationProvider.Interfaces.Services.Tokens;
 
@@ -12,7 +13,7 @@ public interface IAccessTokenService
     /// </summary>
     /// <param name="userEntity">The user for whom the access token is being generated.</param>
     /// <returns>A JWT access token as a string.</returns>
-    string GenerateAccessToken(ApplicationUser user);
+    Task<string> GenerateAccessToken(UserEntity user);
 
     /// <summary>
     /// Retrieves the user ID from a JWT token.
@@ -26,14 +27,13 @@ public interface IAccessTokenService
     /// </summary>
     /// <param name="token">The JWT token to validate.</param>
     /// <returns>True if the token is valid, false if it is blacklisted or invalid.</returns>
-    (bool isAuthenticated, bool isAccountVerified) ValidateAccessToken(string token);
+    (bool isAuthenticated, bool isEmailVerified) ValidateAccessToken(string token);
 
     /// <summary>
     /// Revokes the access token for the specified user by adding it to the blacklist and removing it from in-memory storage.
     /// </summary>
     /// <param name="user">The user whose access token is to be revoked.</param>
-    Task RevokeAndBlacklistAccessToken(ApplicationUser user);
+    Task RevokeAndBlacklistAccessToken(string userId);
 
-    // Method for cleaning up expired tokens
     void CleanUpExpiredTokens();
 }

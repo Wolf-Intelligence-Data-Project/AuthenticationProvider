@@ -1,5 +1,5 @@
 ﻿using AuthenticationProvider.Models.Responses;
-using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Interfaces.Utilities;
 

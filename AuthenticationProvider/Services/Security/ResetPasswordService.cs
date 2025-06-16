@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using AuthenticationProvider.Interfaces.Repositories;
 using AuthenticationProvider.Interfaces.Utilities.Security;
-using AuthenticationProvider.Models.Data.Requests;
-using System.IdentityModel.Tokens.Jwt;
 using AuthenticationProvider.Interfaces.Services.Tokens;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
+using AuthenticationProvider.Models.Requests;
+using AuthenticationProvider.Models.Dtos;
 
 namespace AuthenticationProvider.Services.Security;
 
@@ -35,7 +35,6 @@ public class ResetPasswordService : IResetPasswordService
         {
             var resetPasswordTokenInfo = await _resetPasswordTokenService.GenerateResetPasswordTokenAsync(email);
 
-            // Now you can access both TokenId and TokenString from the resetPasswordTokenInfo object
             string resetId = resetPasswordTokenInfo.TokenId;
             string token = resetPasswordTokenInfo.TokenString;
 
@@ -57,7 +56,6 @@ public class ResetPasswordService : IResetPasswordService
         }
     }
 
-
     /// <summary>
     /// Sends a reset password email using the provided token.
     /// </summary>
@@ -73,14 +71,6 @@ public class ResetPasswordService : IResetPasswordService
 
     try
     {
-        // Validate the email in the token
-        //if (!await EmailValidation(token))
-        //{
-        //    _logger.LogWarning("The email in the token does not match any user.");
-        //    return false;
-        //}
-
-        // Validate the reset password token
         var resetPasswordToken = await _resetPasswordTokenService.ValidateResetPasswordTokenAsync(resetId);
         if (!resetPasswordToken)
         {
@@ -88,13 +78,11 @@ public class ResetPasswordService : IResetPasswordService
             return false;
         }
 
-        // Create ResetPasswordEmailRequest using the resetId
-        var resetRequest = new SendResetPasswordRequest
+        var resetRequest = new ResetPasswordDto
         {
-            ResetId = resetId // Use the resetId as VerificationId
+            ResetId = resetId 
         };
 
-        // Send the reset password email using the client
         bool result = await _resetPasswordClient.SendResetPasswordEmailAsync(resetRequest);
 
         if (result)
@@ -138,8 +126,6 @@ public class ResetPasswordService : IResetPasswordService
 
         try
         {
-
-            // Validate the reset password token
             var resetPasswordToken = await _resetPasswordTokenService.GetValidResetPasswordTokenAsync(resetPasswordRequest.ResetId);
             if (resetPasswordToken == null)
             {
@@ -147,14 +133,12 @@ public class ResetPasswordService : IResetPasswordService
                 return false;
             }
 
-            // Additional validation logic
             if (resetPasswordToken.IsUsed)
             {
                 _logger.LogWarning("The reset password token has already been used.");
                 return false;
             }
 
-            // Update the user's password hash
             var user = await _userRepository.GetByIdAsync(resetPasswordToken.UserId);
             if (user != null)
             {
@@ -167,7 +151,6 @@ public class ResetPasswordService : IResetPasswordService
                 return false;
             }
 
-            // Mark the token as used
             await _resetPasswordTokenService.MarkResetPasswordTokenAsUsedAsync(resetPasswordToken.Id);
 
             _logger.LogInformation("Password reset successfully.");

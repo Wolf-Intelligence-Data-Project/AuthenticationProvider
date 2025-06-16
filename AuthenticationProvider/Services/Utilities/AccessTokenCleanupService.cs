@@ -4,7 +4,7 @@ namespace AuthenticationProvider.Services.Utilities;
 
 public class AccessTokenCleanupService : IHostedService, IDisposable
 {
-    private readonly IServiceScopeFactory _serviceScopeFactory; // Inject IServiceScopeFactory
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private Timer _timer;
 
     public AccessTokenCleanupService(IServiceScopeFactory serviceScopeFactory)
@@ -14,18 +14,16 @@ public class AccessTokenCleanupService : IHostedService, IDisposable
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Set timer to run every hour (adjust as needed)
         _timer = new Timer(CleanUpExpiredTokens, null, TimeSpan.Zero, TimeSpan.FromHours(1));
         return Task.CompletedTask;
     }
 
     private void CleanUpExpiredTokens(object state)
     {
-        // Use IServiceScopeFactory to create a scope and resolve IAccessTokenService
         using (var scope = _serviceScopeFactory.CreateScope())
         {
             var accessTokenService = scope.ServiceProvider.GetRequiredService<IAccessTokenService>();
-            accessTokenService.CleanUpExpiredTokens(); // Call your method
+            accessTokenService.CleanUpExpiredTokens(); 
         }
     }
 

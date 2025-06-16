@@ -27,7 +27,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         _logger = logger;
     }
 
-    public async Task<TokenInfo> GenerateResetPasswordTokenAsync(string email)
+    public async Task<TokenInfoModel> GenerateResetPasswordTokenAsync(string email)
     {
         try
         {
@@ -44,7 +44,6 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 throw new ArgumentException("Inget företag hittades med den angivna e-postadressen.");
             }
 
-            // Delete previous token if any exists
             await _resetPasswordTokenRepository.DeleteAsync(user.UserId);
 
             var secretKey = _configuration["JwtResetPassword:Key"];
@@ -84,8 +83,7 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
             await _resetPasswordTokenRepository.CreateAsync(resetPasswordToken);
             string tokenId = resetPasswordToken.Id.ToString();
 
-            // Return a structured object instead of just a tokenId
-            return new TokenInfo
+            return new TokenInfoModel
             {
                 TokenId = tokenId,
                 TokenString = tokenString
@@ -116,7 +114,6 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
 
         _logger.LogInformation("Attempting to parse TokenId: {TokenId}", tokenId);
 
-        // Try to parse the tokenId as a GUID
         if (!Guid.TryParse(tokenId, out Guid parsedTokenId))
         {
             _logger.LogWarning("Invalid token ID format: {TokenId}", tokenId);
@@ -127,21 +124,18 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
         {
             var resetPasswordToken = await _resetPasswordTokenRepository.GetByIdAsync(parsedTokenId);
 
-            // Check if the token exists
             if (resetPasswordToken == null)
             {
                 _logger.LogWarning("No reset password token found for tokenId: {TokenId}", tokenId);
-                return false; // Token not found
+                return false;
             }
 
-            // Perform additional checks: expiry and usage status
             var stockholmTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Stockholm"));
 
-            // Check if the token has expired or if it is already used
             if (resetPasswordToken.ExpiryDate <= stockholmTime || resetPasswordToken.IsUsed)
             {
                 _logger.LogWarning("Reset password token expired or already used for tokenId: {TokenId}", tokenId);
-                return false; // Invalid token
+                return false;
             }
             string token = resetPasswordToken.Token.ToString();
             if (string.IsNullOrEmpty(token))
@@ -170,14 +164,12 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
                 ValidIssuer = issuer,
                 ValidAudience = audience,
                 IssuerSigningKey = securityKey,
-                ClockSkew = TimeSpan.Zero  // No tolerance for expired tokens
+                ClockSkew = TimeSpan.Zero
             };
 
-            // Validate the token
             var validatedToken = tokenHandler.ValidateToken(token, validationParameters, out var validated);
             _logger.LogInformation("Token validated successfully.");
 
-            // Now check the token taken from the database (if it's not expired or used)
             if (resetPasswordToken == null)
             {
                 _logger.LogWarning("Reset password token not found in the database.");
@@ -186,7 +178,6 @@ public class ResetPasswordTokenService : IResetPasswordTokenService
 
             _logger.LogInformation("Reset password token found. Expiry Date: {ExpiryDate}", resetPasswordToken.ExpiryDate);
 
-            // Check if the token is used or expired
             if (resetPasswordToken.IsUsed || resetPasswordToken.ExpiryDate < stockholmTime)
             {
                 _logger.LogWarning("Reset password token is either used or expired.");

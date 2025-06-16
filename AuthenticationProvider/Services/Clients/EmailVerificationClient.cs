@@ -1,30 +1,30 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
 using AuthenticationProvider.Interfaces.Services.Security.Clients;
-using AuthenticationProvider.Models.Data.Requests;
+using AuthenticationProvider.Models.Dtos;
 
-namespace AuthenticationProvider.Services.Security.Clients;
+namespace AuthenticationProvider.Services.Clients;
 
 /// <summary>
-/// Handles dispatching account verification tokens to an external service responsible for sending emails to users.
+/// Handles dispatching email verification tokens to an external service responsible for sending emails to users.
 /// This client communicates with the configured verification provider to request email delivery.
 /// </summary>
-public class AccountVerificationClient : IAccountVerificationClient
+public class EmailVerificationClient : IEmailVerificationClient
 {
     private readonly HttpClient _httpClient;
-    private readonly string _accountVerificationEndpoint;
-    private readonly ILogger<AccountVerificationClient> _logger;
-    public AccountVerificationClient(HttpClient httpClient, IConfiguration configuration, ILogger<AccountVerificationClient> logger)
+    private readonly string _emailVerificationEndpoint;
+    private readonly ILogger<EmailVerificationClient> _logger;
+    public EmailVerificationClient(HttpClient httpClient, IConfiguration configuration, ILogger<EmailVerificationClient> logger)
     {
         _httpClient = httpClient;
-        _accountVerificationEndpoint = configuration["AccountVerificationProvider:Endpoint"]
+        _emailVerificationEndpoint = configuration["EmailVerificationProvider:Endpoint"]
             ?? throw new ArgumentNullException("Endpoint is not configured.");
 
         _logger = logger;
     }
 
     /// <summary>
-    /// Sends an account verification request containing a unique token to an external email provider.
+    /// Sends an email verification request containing a unique token to an external email provider.
     /// The external provider is responsible for delivering the verification email.
     /// </summary>
     /// <param name="token">The verification token required for confirming user identity.</param>
@@ -33,7 +33,7 @@ public class AccountVerificationClient : IAccountVerificationClient
     /// </returns>
     /// <exception cref="HttpRequestException">Thrown if a network-related issue occurs.</exception>
     /// <exception cref="Exception">Thrown for unexpected failures during the request.</exception>
-    public async Task<bool> SendVerificationEmailAsync( SendVerificationRequest sendVerificationRequest)
+    public async Task<bool> SendVerificationEmailAsync( EmailVerificationDto sendVerificationRequest)
     {
         if (sendVerificationRequest == null)
         {
@@ -45,14 +45,14 @@ public class AccountVerificationClient : IAccountVerificationClient
         {
             var content = new StringContent(JsonConvert.SerializeObject(sendVerificationRequest), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_accountVerificationEndpoint, content);
+            var response = await _httpClient.PostAsync(_emailVerificationEndpoint, content);
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Account verification email sent successfully.");
+                _logger.LogInformation("Email verification email sent successfully.");
                 return true;
             }
-            // Log the error response if the request failed.
+
             var errorResponse = await response.Content.ReadAsStringAsync();
             _logger.LogWarning("Failed to send reset password email. Status Code: {StatusCode}, Response: {ErrorResponse}",
                 response.StatusCode, errorResponse);

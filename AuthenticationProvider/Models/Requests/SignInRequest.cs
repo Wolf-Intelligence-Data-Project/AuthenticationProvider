@@ -1,15 +1,15 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Requests;
+namespace AuthenticationProvider.Models.Requests;
 
 public class SignInRequest
 {
     [Required(ErrorMessage = "Ogiltiga inloggningsuppgifter.")]
-    public string Email { get; set; } = null!;
+    public string Email { get; set; }
 
     [Required(ErrorMessage = "Ogiltiga inloggningsuppgifter.")]
     [DataType(DataType.Password)]
-    public string Password { get; set; } = null!;
+    public string Password { get; set; }
 
     public string? CaptchaToken { get; set; }
 }

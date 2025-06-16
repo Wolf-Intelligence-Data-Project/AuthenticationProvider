@@ -5,28 +5,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthenticationProvider.Repositories.Tokens;
 
-/// Repository for handling operations related to account verification tokens.
-public class AccountVerificationTokenRepository : IAccountVerificationTokenRepository
+/// Repository for handling operations related to email verification tokens.
+public class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
 {
     private readonly UserDbContext _userDbcontext;
-    private readonly ILogger<AccountVerificationTokenRepository> _logger;
+    private readonly ILogger<EmailVerificationTokenRepository> _logger;
 
-    public AccountVerificationTokenRepository(UserDbContext context, ILogger<AccountVerificationTokenRepository> logger)
+    public EmailVerificationTokenRepository(UserDbContext context, ILogger<EmailVerificationTokenRepository> logger)
     {
         _userDbcontext = context;
         _logger = logger;
     }
 
     /// <summary>
-    /// Creates a new account verification token and saves it to the database.
+    /// Creates a new email verification token and saves it to the database.
     /// </summary>
     /// <param name="token">The token entity to be created.</param>
     /// <returns>The created token entity.</returns>
-    public async Task<AccountVerificationTokenEntity> CreateAsync(AccountVerificationTokenEntity token)
+    public async Task<EmailVerificationTokenEntity> CreateAsync(EmailVerificationTokenEntity token)
     {
         try
         {
-            await _userDbcontext.AccountVerificationTokens.AddAsync(token);
+            await _userDbcontext.EmailVerificationTokens.AddAsync(token);
             await _userDbcontext.SaveChangesAsync();
             return token;
         }
@@ -37,15 +37,15 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     }
 
     /// <summary>
-    /// Retrieves an un-used account verification token by its token string.
+    /// Retrieves an un-used email verification token by its token string.
     /// </summary>
     /// <param name="token">The token string to search for.</param>
     /// <returns>The found token entity, or null if not found.</returns>
-    public async Task<AccountVerificationTokenEntity> GetByTokenAsync(string token)
+    public async Task<EmailVerificationTokenEntity> GetByTokenAsync(string token)
     {
         try
         {
-            return await _userDbcontext.AccountVerificationTokens
+            return await _userDbcontext.EmailVerificationTokens
                 .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
         }
         catch (Exception ex)
@@ -55,15 +55,15 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     }
 
     /// <summary>
-    /// Retrieves an account verification token by its ID.
+    /// Retrieves an email verification token by its ID.
     /// </summary>
     /// <param name="tokenId">The token's unique ID.</param>
     /// <returns>The found token entity, or null if not found.</returns>
-    public async Task<AccountVerificationTokenEntity> GetByIdAsync(Guid tokenId)
+    public async Task<EmailVerificationTokenEntity> GetByIdAsync(Guid tokenId)
     {
         try
         {
-            return await _userDbcontext.AccountVerificationTokens
+            return await _userDbcontext.EmailVerificationTokens
                                  .FirstOrDefaultAsync(t => t.Id == tokenId);
         }
         catch (Exception ex)
@@ -80,7 +80,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     {
         try
         {
-            var token = await _userDbcontext.AccountVerificationTokens.FindAsync(tokenId);
+            var token = await _userDbcontext.EmailVerificationTokens.FindAsync(tokenId);
             if (token != null)
             {
                 token.IsUsed = true;
@@ -98,26 +98,27 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     }
 
     /// <summary>
-    /// Revokes and deletes all account verification tokens for a specific user.
+    /// Revokes and deletes all email verification tokens for a specific user.
     /// </summary>
     /// <param name="userId">The user's unique ID.</param>
     public async Task RevokeAndDeleteAsync(Guid userId)
     {
         try
         {
-            var user = await _userDbcontext.Users.FirstOrDefaultAsync(c => c.UserId == userId);
+            _logger.LogInformation("Looking for user with UserId: {UserId}", userId);
+            var user = await _userDbcontext.Set<UserEntity>().FirstOrDefaultAsync(c => c.UserId == userId);
             if (user == null)
             {
                 _logger.LogWarning("User not found.");
                 return;
             }
 
-            if (!user.IsVerified)
+            if (user.IsVerified)
             {
                 return;
             }
 
-            var tokens = await _userDbcontext.AccountVerificationTokens
+            var tokens = await _userDbcontext.EmailVerificationTokens
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
 
@@ -128,7 +129,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
                     token.IsUsed = true;
                 }
 
-                _userDbcontext.AccountVerificationTokens.RemoveRange(tokens);
+                _userDbcontext.EmailVerificationTokens.RemoveRange(tokens);
                 await _userDbcontext.SaveChangesAsync();
             }
             else
@@ -143,7 +144,7 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
     }
 
     /// <summary>
-    /// Revokes and deletes a specific account verification token by its token string.
+    /// Revokes and deletes a specific email verification token by its token string.
     /// </summary>
     /// <param name="token">The token string to be revoked and deleted.</param>
     public async Task RevokeAndDeleteByTokenAsync(string token)
@@ -153,11 +154,10 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
             if (string.IsNullOrEmpty(token))
             {
                 _logger.LogWarning("No token provided for revocation.");
-                return;  // Just return as no action is needed
+                return;
             }
 
-            // Retrieve the token from the database
-            var tokenEntity = await _userDbcontext.AccountVerificationTokens
+            var tokenEntity = await _userDbcontext.EmailVerificationTokens
                                              .FirstOrDefaultAsync(t => t.Token == token && !t.IsUsed);
             if (tokenEntity == null)
             {
@@ -165,9 +165,8 @@ public class AccountVerificationTokenRepository : IAccountVerificationTokenRepos
                 return;
             }
 
-            // Mark the token as used and delete it
             tokenEntity.IsUsed = true;
-            _userDbcontext.AccountVerificationTokens.Remove(tokenEntity);
+            _userDbcontext.EmailVerificationTokens.Remove(tokenEntity);
             await _userDbcontext.SaveChangesAsync();
 
             _logger.LogInformation("Token has been revoked and deleted.");

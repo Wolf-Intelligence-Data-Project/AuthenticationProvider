@@ -1,8 +1,8 @@
-﻿using AuthenticationProvider.Models.Data.Requests;
+﻿using AuthenticationProvider.Models.Requests;
 
 namespace AuthenticationProvider.Interfaces.Utilities.Security;
 
-public interface IAccountSecurityService
+public interface IEmailSecurityService
 {
     /// <summary>
     /// Attempts to change the email address of a user after validating the provided security token.

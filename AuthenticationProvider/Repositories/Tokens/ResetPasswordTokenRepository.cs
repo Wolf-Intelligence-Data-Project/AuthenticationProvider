@@ -26,7 +26,7 @@ public class ResetPasswordTokenRepository : IResetPasswordTokenRepository
         try
         {
             return await _userDbContext.ResetPasswordTokens
-                .FirstOrDefaultAsync(t => t.Id == id); // Just fetch the token, no validation here
+                .FirstOrDefaultAsync(t => t.Id == id);
         }
         catch (Exception ex)
         {

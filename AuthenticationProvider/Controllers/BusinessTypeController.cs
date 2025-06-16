@@ -25,8 +25,8 @@ public class BusinessTypeController : ControllerBase
             .Cast<BusinessTypeEnum>()
             .Select(e => new
             {
-                Value = e.ToString(),  // Get the string name of the enum
-                DisplayName = GetEnumDisplayName(e)  // DisplayName from the DisplayAttribute
+                Value = e.ToString(),
+                DisplayName = GetEnumDisplayName(e)
             })
             .ToList();
 
@@ -42,6 +42,6 @@ public class BusinessTypeController : ControllerBase
     {
         var fieldInfo = businessTypeEnum.GetType().GetField(businessTypeEnum.ToString());
         var attribute = fieldInfo.GetCustomAttribute<DisplayAttribute>();
-        return attribute?.Name ?? businessTypeEnum.ToString(); // fallback to enum name
+        return attribute?.Name ?? businessTypeEnum.ToString();
     }
 }

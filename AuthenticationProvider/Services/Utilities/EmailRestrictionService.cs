@@ -35,13 +35,11 @@ public class EmailRestrictionService : IEmailRestrictionService
             // Retrieve restricted emails list
             var restrictedEmails = _configuration.GetSection("RestrictedEmails").Get<string[]>();
 
-            // If no restricted emails are defined, return false
             if (restrictedEmails == null || restrictedEmails.Length == 0)
             {
                 return false;
             }
 
-            // Check if the email is present in the restricted list (case insensitive comparison)
             bool isRestricted = restrictedEmails.Contains(email, StringComparer.OrdinalIgnoreCase);
 
             return isRestricted;

@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AuthenticationProvider.Models.Data.Requests;
+namespace AuthenticationProvider.Models.Dtos;
 
-public class SendVerificationRequest
+public class EmailVerificationDto
 {
     [Required]
     public string VerificationId { get; set; }

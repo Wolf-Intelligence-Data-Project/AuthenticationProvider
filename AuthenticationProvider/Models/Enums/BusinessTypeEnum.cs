@@ -141,7 +141,7 @@ public enum BusinessTypeEnum
     ArtsAndCulture,
 
     [Display(Name = "Redovisning")]
-    Accounting,
+    Emailing,
 
     [Display(Name = "Human Resources")]
     HumanResources,

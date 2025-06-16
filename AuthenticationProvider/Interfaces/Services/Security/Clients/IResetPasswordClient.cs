@@ -1,4 +1,4 @@
-﻿using AuthenticationProvider.Models.Data.Requests;
+﻿using AuthenticationProvider.Models.Dtos;
 
 namespace AuthenticationProvider.Interfaces.Services.Security.Clients;
 
@@ -15,5 +15,5 @@ public interface IResetPasswordClient
     /// </summary>
     /// <param name="resetId">A unique token used to authorize the password reset request.</param>
     /// <returns>True if the request was successfully processed by the provider; otherwise, false.</returns>
-    Task<bool> SendResetPasswordEmailAsync(SendResetPasswordRequest sendResetPasswordRequest);
+    Task<bool> SendResetPasswordEmailAsync(ResetPasswordDto sendResetPasswordRequest);
 }
